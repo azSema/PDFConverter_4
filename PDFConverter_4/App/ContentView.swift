@@ -2,8 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     
-    @StateObject private var router: Router = .init()
-    @StateObject private var premium: PremiumManager = .init()
+    @EnvironmentObject private var router: Router
+    @EnvironmentObject private var pdfStorage: PDFConverterStorage
+    @EnvironmentObject private var premium: PremiumManager
     
     var body: some View {
         
@@ -20,8 +21,6 @@ struct ContentView: View {
              }
          }
          .animation(.easeInOut, value: premium.isProcessing)
-        .environmentObject(router)
-        .environmentObject(premium)
     }
     
 }

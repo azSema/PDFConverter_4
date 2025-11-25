@@ -17,80 +17,123 @@ enum AppTab: CaseIterable {
         }
     }
     
-    var iconName: String {
+    var selectedIcon: ImageResource {
         switch self {
-        case .convert: return "arrow.triangle.2.circlepath"
-        case .edit: return "pencil.circle"
-        case .scan: return "doc.viewfinder"
-        case .sign: return "signature"
-        case .settings: return "gearshape"
+        case .convert:
+                .convertSelected
+        case .edit:
+                .editSelected
+        case .scan:
+                .scan
+        case .sign:
+                .signSelected
+        case .settings:
+                .settingsSelected
+        }
+    }
+    
+    var nonSelectedIcon: ImageResource {
+        switch self {
+        case .convert:
+                .convertNonSelected
+        case .edit:
+                .editNonSelected
+        case .scan:
+                .scan
+        case .sign:
+                .signNonSelected
+        case .settings:
+                .settingsNonSelected
         }
     }
 }
 
 struct MainFlow: View {
     
-    @State private var selectedTab: AppTab = .convert
+    @EnvironmentObject var router: Router
+    @EnvironmentObject var pdfStorage: PDFConverterStorage
+    
+    init() {
+        UITabBar.appearance().isHidden = true
+    }
     
     var body: some View {
-        VStack(spacing: 0) {
-            
-            // Main Content
-            Group {
-                switch selectedTab {
-                case .convert:
-                    ConvertView()
-                case .edit:
-                    EditView()
-                case .scan:
-                    ScanView()
-                case .sign:
-                    SignView()
-                case .settings:
-                    SettingsView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            // Custom Tab Bar
-            CustomTabBar(selectedTab: $selectedTab)
+        NavigationStack(path: $router.path) {
+            TabView(selection: $router.selectedTab) {
+                 
+                 ConvertView()
+                     .tag(AppTab.convert)
+                 
+                 EditView()
+                     .tag(AppTab.edit)
+                 
+                EmptyView()
+                     .tag(AppTab.scan)
+                 
+                 SignView()
+                     .tag(AppTab.sign)
+                 
+                 SettingsView()
+                     .tag(AppTab.settings)
+             }
+             .navigationDestination(for: Destination.self) { destination in
+                 destination.makeView()
+                     .environmentObject(pdfStorage)
+                     .environmentObject(router)
+             }
+             .overlay(
+                 VStack {
+                     Spacer()
+                     CustomTabBar(selectedTab: $router.selectedTab)
+                 }
+             )
+             .ignoresSafeArea(.all, edges: .bottom)
+             .fullScreenCover(isPresented: $router.isShowingScanner) {
+                 FullScreenScannerView()
+                     .environmentObject(router)
+                     .environmentObject(pdfStorage)
+             }
         }
-        .ignoresSafeArea(.all, edges: .bottom)
-    }
+     }
+    
 }
 
 struct CustomTabBar: View {
     @Binding var selectedTab: AppTab
+    @Namespace private var animation
     
     var body: some View {
-        HStack {
+        
+        HStack(spacing: 8) {
             ForEach(AppTab.allCases, id: \.self) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: tab.iconName)
-                            .font(.system(size: 20))
-                            .foregroundColor(selectedTab == tab ? Color(hex: "007AFF") : Color(hex: "8E8E93"))
-                        
-                        Text(tab.title)
-                            .font(.medium(10))
-                            .foregroundColor(selectedTab == tab ? Color(hex: "007AFF") : Color(hex: "8E8E93"))
+                HStack(spacing: 20) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            selectedTab = tab
+                        }
+                    } label: {
+                        Image(selectedTab == tab ? tab.selectedIcon : tab.nonSelectedIcon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .foregroundColor(selectedTab == tab ? .appRed : .appStroke)
                     }
-                    .frame(maxWidth: .infinity)
+                    if tab != .settings {
+                        Rectangle()
+                            .fill(.appStroke)
+                            .frame(width: 1, height: 16)
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
+                .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Color(hex: "F8F9FA"))
-        .overlay(
-            Rectangle()
-                .frame(height: 0.5)
-                .foregroundColor(Color(hex: "E5E5E7")),
-            alignment: .top
-        )
+        .padding(.horizontal, 21)
+        .padding(.vertical, 24)
+        .background(Color.appWhite)
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 1)
+        .padding(20)
+        .padding(.bottom, 10)
     }
 }
 

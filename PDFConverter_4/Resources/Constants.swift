@@ -1,5 +1,16 @@
 import SwiftUI
 
+// MARK: - App Constants
+
+struct AppConstants {
+    static let appID = "1234567890" // TODO: Replace with actual App Store ID
+    static let supportEmail = "support@liteconvert.app" // TODO: Replace with actual support email
+    static let appStoreURL = "https://apps.apple.com/app/id\(appID)"
+    static let shareURL = "https://apps.apple.com/app/id\(appID)"
+}
+
+// MARK: - Device Type
+
 var deviceType: DeviceType {
     let idiom = UIDevice.current.userInterfaceIdiom
     if idiom == .pad { return .ipad }
