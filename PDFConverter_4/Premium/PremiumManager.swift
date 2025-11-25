@@ -7,6 +7,8 @@ final class PremiumManager: ObservableObject {
     
     @Published var hasSubscription = false
     
+    @Published var isPresentingPaywall = false
+    
     func makePurchase() async {
         withAnimation { isProcessing = true }
         try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -15,6 +17,12 @@ final class PremiumManager: ObservableObject {
                 isProcessing = false
                 hasSubscription = true
             }
+        }
+    }
+    
+    func presentPaywall(_ isPresenting: Bool) {
+        withAnimation {
+            isPresentingPaywall = isPresenting
         }
     }
     

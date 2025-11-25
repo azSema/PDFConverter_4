@@ -10,13 +10,14 @@ struct DocumentDTO: Identifiable, Hashable {
     var url: URL?
     var isFavorite: Bool
     
-    init(pdf: PDFDocument? = nil,
+    init(id: String = UUID().uuidString,
+         pdf: PDFDocument? = nil,
          name: String = "",
          type: DocumentType = .pdf,
-         size: String = "",
          date: Date = .now,
          url: URL? = nil,
          isFavorite: Bool = false) {
+        self.id = id
         self.pdf = pdf
         self.name = name
         self.type = type
@@ -28,9 +29,13 @@ struct DocumentDTO: Identifiable, Hashable {
     var thumbnail: UIImage {
         switch type {
         case .pdf:
-            pdf?.page(at: 0)?.toImage() ?? UIImage(systemName: "document")!
+            if let firstPage = pdf?.page(at: 0) {
+                return firstPage.toImage() ?? UIImage(systemName: "document")!
+            } else {
+                return UIImage(systemName: "document")!
+            }
         case .doc:
-            UIImage(systemName: "document")!
+            return UIImage(systemName: "document")!
         }
     }
     

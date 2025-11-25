@@ -7,6 +7,8 @@ final class Router: ObservableObject {
     
     @Published var path: [Destination] = []
     
+    @Published var selectedTab: AppTab = .convert
+    
     func finishOnboarding() {
         withAnimation { isOnboarding = false }
     }
