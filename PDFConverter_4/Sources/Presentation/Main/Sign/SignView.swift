@@ -1,8 +1,15 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SignView: View {
     
-    @State private var showDocumentPicker = false
+    @EnvironmentObject private var storage: PDFConverterStorage
+    @StateObject private var viewModel: SignViewModel
+    @State private var showDocumentTypePicker = false
+    
+    init() {
+        self._viewModel = StateObject(wrappedValue: SignViewModel(storage: PDFConverterStorage()))
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -13,108 +20,227 @@ struct SignView: View {
                 showProButton: true, content: {}
             )
             
-            VStack(spacing: 0) {
-                
+            if viewModel.documents.isEmpty && !viewModel.isLoading {
                 // Empty State
-                VStack(spacing: 24) {
-                    Spacer()
-                    
-                    Image(systemName: "signature")
-                        .font(.system(size: 80))
-                        .foregroundColor(Color(hex: "C7C7CC"))
-                    
-                    VStack(spacing: 12) {
-                        Text("No documents to sign")
-                            .font(.semiBold(20))
-                            .foregroundColor(Color(hex: "000000"))
-                        
-                        Text("Select a document to add your signature")
-                            .font(.regular(16))
-                            .foregroundColor(Color(hex: "8E8E93"))
-                    }
-                    
-                    Button {
-                        showDocumentPicker = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                            
-                            Text("Select Document")
-                                .font(.semiBold(16))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color(hex: "007AFF"))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Sign Features
-                    VStack(spacing: 16) {
-                        SignFeatureRow(
-                            icon: "pencil.tip.crop.circle",
-                            title: "Digital Signature",
-                            description: "Create and place your signature"
-                        )
-                        
-                        SignFeatureRow(
-                            icon: "textformat.abc",
-                            title: "Text Fields",
-                            description: "Add text fields and annotations"
-                        )
-                        
-                        SignFeatureRow(
-                            icon: "calendar.badge.clock",
-                            title: "Date Stamps",
-                            description: "Insert current date and time"
-                        )
-                    }
-                    .padding(.top, 32)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
+                EmptySignState(onSelectFile: {
+                    showDocumentTypePicker = true
+                })
+            } else {
+                // Documents List
+                DocumentsListView()
             }
         }
-        .background(Color(hex: "FFFFFF"))
-        .sheet(isPresented: $showDocumentPicker) {
-            DocumentPickerView { url in
-                print("Selected document for signing: \(url)")
+        .background(Color.appWhite)
+        .environmentObject(viewModel)
+        .onAppear {
+            viewModel.loadDocuments()
+        }
+        .sheet(isPresented: $showDocumentTypePicker) {
+            DocumentTypePickerSheetSign { fileType in
+                handleFileTypeSelection(fileType)
+            }
+        }
+        .sheet(isPresented: $viewModel.showFilePicker) {
+            DocumentPickerView(
+                allowedContentTypes: [.pdf, .image, .plainText, .text],
+                allowsMultipleSelection: false
+            ) { urls in
+                if let url = urls.first {
+                    viewModel.handleFileImport(url: url)
+                }
+            }
+        }
+        .sheet(isPresented: $viewModel.showDocumentDetail) {
+            if let document = viewModel.editingDocument {
+                DocumentSignView(document: document)
+            }
+        }
+    }
+    
+    private func handleFileTypeSelection(_ fileType: EditableFileType) {
+        viewModel.showFilePicker = true
+    }
+}
+
+// MARK: - Empty State
+
+struct EmptySignState: View {
+    let onSelectFile: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            
+            VStack(spacing: 32) {
+                Image(systemName: "signature")
+                    .font(.system(size: 80, weight: .light))
+                    .foregroundColor(Color.appGray.opacity(0.6))
+                
+                VStack(spacing: 16) {
+                    Text("No documents to sign")
+                        .font(.semiBold(24))
+                        .foregroundColor(Color.appWhite)
+                    
+                    Text("Select a document to add your signature\n(PDF/Image/Text)")
+                        .font(.regular(16))
+                        .foregroundColor(Color.appGray)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(nil)
+                }
+                
+                Button(action: onSelectFile) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 20))
+                        
+                        Text("Select Document")
+                            .font(.semiBold(16))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                    .background(Color.appRed)
+                    .cornerRadius(16)
+                    .shadow(color: Color.appRed.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+    }
+}
+
+// MARK: - Documents List (Reused from Edit)
+
+extension SignView {
+    
+    private func DocumentsListView() -> some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(viewModel.documents) { document in
+                        DocumentRowView(document: document) {
+                            viewModel.openDocument(document)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+            }
+            
+            // Floating Add Button
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    viewModel.handleFileSelection()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 56, height: 56)
+                        .background(Color.appRed)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
             }
         }
     }
 }
 
-struct SignFeatureRow: View {
-    let icon: String
-    let title: String
-    let description: String
+// MARK: - Document Sign View
+
+struct DocumentSignView: View {
+    let document: DocumentDTO
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(Color(hex: "007AFF"))
-                .frame(width: 32)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.medium(16))
-                    .foregroundColor(Color(hex: "000000"))
+        NavigationView {
+            VStack {
+                Text("Document signing functionality coming soon")
+                    .font(.regular(16))
+                    .foregroundColor(Color.appGray)
+                    .multilineTextAlignment(.center)
+                    .padding()
                 
-                Text(description)
-                    .font(.regular(14))
-                    .foregroundColor(Color(hex: "8E8E93"))
+                Spacer()
             }
-            
-            Spacer()
+            .navigationTitle("Sign Document")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(Color.appRed)
+                }
+            }
         }
-        .padding(.horizontal, 16)
+    }
+}
+
+// MARK: - Document Type Picker (Reused from Edit)
+
+struct DocumentTypePickerSheetSign: View {
+    @Environment(\.dismiss) private var dismiss
+    let onTypePicked: (EditableFileType) -> Void
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                ForEach(EditableFileType.allCases, id: \.self) { fileType in
+                    Button {
+                        onTypePicked(fileType)
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Image(systemName: fileType.iconName)
+                                .font(.system(size: 24))
+                                .foregroundColor(Color.appRed)
+                                .frame(width: 40)
+                            
+                            Text(fileType.rawValue + " Files")
+                                .font(.medium(18))
+                                .foregroundColor(Color.appBlack)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(Color.appGray)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(Color.appWhite)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.appStroke, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Spacer()
+            }
+            .padding(20)
+            .background(Color.appWhite)
+            .navigationTitle("Select File Type")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(Color.appRed)
+                }
+            }
+        }
     }
 }
 
 #Preview {
     SignView()
+        .environmentObject(PDFConverterStorage())
 }

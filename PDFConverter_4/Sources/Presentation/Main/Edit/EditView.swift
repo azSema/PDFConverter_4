@@ -22,9 +22,9 @@ struct EditView: View {
             
             if viewModel.documents.isEmpty && !viewModel.isLoading {
                 // Empty State
-                EmptyEditState(onSelectFile: {
-                    showDocumentTypePicker = true
-                })
+                addFileToEditVIew
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
             } else {
                 // Documents List
                 DocumentsListView()
@@ -60,57 +60,35 @@ struct EditView: View {
     private func handleFileTypeSelection(_ fileType: EditableFileType) {
         viewModel.showFilePicker = true
     }
-}
-
-// MARK: - Empty State
-
-struct EmptyEditState: View {
-    let onSelectFile: () -> Void
     
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            VStack(spacing: 32) {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.system(size: 80, weight: .light))
-                    .foregroundColor(Color.appGray.opacity(0.6))
-                
-                VStack(spacing: 16) {
-                    Text("All files to edit")
-                        .font(.semiBold(24))
-                        .foregroundColor(Color.appWhite)
-                    
-                    Text("Select a file to start editing\n(PDF/Image/Text)")
-                        .font(.regular(16))
-                        .foregroundColor(Color.appGray)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(nil)
-                }
-                
-                Button(action: onSelectFile) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 20))
-                        
-                        Text("Select File")
-                            .font(.semiBold(16))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 16)
-                    .background(Color.appWhite)
-                    .cornerRadius(16)
-                    .shadow(color: Color.appWhite.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .buttonStyle(PlainButtonStyle())
+    private var addFileToEditVIew: some View {
+        Button {
+            showDocumentTypePicker = true
+        } label: {
+            VStack(spacing: 24) {
+                Image(.plus)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                Text("Add file to edit")
+                    .foregroundStyle(.appBlack)
+                    .font(.medium(15))
             }
-            
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .padding(24)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .foregroundStyle(.appWhite)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(.appStroke, lineWidth: 1)
+                    }
+                    .shadow(color: .appBlack.opacity(0.05), radius: 4, y: 1)
+            }
         }
-        .padding(.horizontal, 24)
     }
 }
+
 
 // MARK: - Documents List
 
@@ -125,13 +103,15 @@ struct DocumentsListView: View {
             }
             
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 16) {
                     ForEach(viewModel.documents) { document in
-                        DocumentRowView(document: document)
+                        DocumentRowView(document: document) {
+                            viewModel.openDocument(document)
+                        }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
             }
         }
         
@@ -184,86 +164,6 @@ struct SelectionToolbar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.appWhite)
-    }
-}
-
-// MARK: - Document Row
-
-struct DocumentRowView: View {
-    let document: DocumentDTO
-    @EnvironmentObject private var viewModel: EditViewModel
-    
-    var body: some View {
-        Button {
-            if viewModel.selectedDocuments.isEmpty {
-                viewModel.openDocument(document)
-            } else {
-                viewModel.toggleDocumentSelection(document.id)
-            }
-        } label: {
-            HStack(spacing: 16) {
-                // Selection indicator
-                if !viewModel.selectedDocuments.isEmpty {
-                    Image(systemName: viewModel.selectedDocuments.contains(document.id) ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(viewModel.selectedDocuments.contains(document.id) ? Color.appWhite : Color.appGray)
-                        .font(.system(size: 20))
-                }
-                
-                // Thumbnail
-                Image(uiImage: document.thumbnail)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 50, height: 50)
-                    .background(Color.appWhite)
-                    .cornerRadius(8)
-                
-                // Document info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(document.name)
-                        .font(.semiBold(16))
-                        .foregroundColor(Color.appGray)
-                        .lineLimit(1)
-                    
-                    Text(document.type.rawValue.uppercased())
-                        .font(.medium(12))
-                        .foregroundColor(Color.appGray)
-                    
-                    Text(document.date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.regular(12))
-                        .foregroundColor(Color.appGray)
-                }
-                
-                Spacer()
-                
-                // Favorite indicator
-                if document.isFavorite {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.red)
-                        .font(.system(size: 16))
-                }
-                
-                // Edit indicator
-                Image(systemName: "chevron.right")
-                    .foregroundColor(Color.appGray)
-                    .font(.system(size: 14))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.appWhite)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(viewModel.selectedDocuments.contains(document.id) ? Color.appWhite : Color.appGray, lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .contextMenu {
-            Button {
-                viewModel.toggleDocumentSelection(document.id)
-            } label: {
-                Label("Select", systemImage: "checkmark.circle")
-            }
-        }
     }
 }
 

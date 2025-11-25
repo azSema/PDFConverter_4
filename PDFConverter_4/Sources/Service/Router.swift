@@ -6,8 +6,28 @@ final class Router: ObservableObject {
     @AppStorage("isOnboarding") var isOnboarding = true
     
     @Published var path: [Destination] = []
-    
     @Published var selectedTab: AppTab = .convert
+    
+    // Scanner state
+    @Published var isShowingScanner = false
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        setupScannerBinding()
+    }
+    
+    private func setupScannerBinding() {
+        // Automatically show scanner when scan tab is selected
+        $selectedTab
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] tab in
+                if tab == .scan {
+                    self?.isShowingScanner = true
+                }
+            }
+            .store(in: &cancellables)
+    }
     
     func finishOnboarding() {
         withAnimation { isOnboarding = false }
@@ -23,6 +43,14 @@ final class Router: ObservableObject {
     
     func popToRoot() {
         path.removeAll()
+    }
+    
+    func dismissScanner() {
+        isShowingScanner = false
+        // Switch back to convert tab after scanner dismissal
+        if selectedTab == .scan {
+            selectedTab = .convert
+        }
     }
     
 }

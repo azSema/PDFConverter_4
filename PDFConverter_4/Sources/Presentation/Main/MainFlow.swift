@@ -66,7 +66,7 @@ struct MainFlow: View {
              EditView()
                  .tag(AppTab.edit)
              
-             ScanView()
+            EmptyView()
                  .tag(AppTab.scan)
              
              SignView()
@@ -82,6 +82,11 @@ struct MainFlow: View {
              }
          )
          .ignoresSafeArea(.all, edges: .bottom)
+         .fullScreenCover(isPresented: $router.isShowingScanner) {
+             FullScreenScannerView()
+                 .environmentObject(router)
+                 .environmentObject(pdfStorage)
+         }
      }
     
 }
@@ -96,7 +101,7 @@ struct CustomTabBar: View {
             ForEach(AppTab.allCases, id: \.self) { tab in
                 HStack(spacing: 20) {
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
                             selectedTab = tab
                         }
                     } label: {
