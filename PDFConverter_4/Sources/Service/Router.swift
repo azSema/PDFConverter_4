@@ -58,6 +58,9 @@ final class Router: ObservableObject {
 enum Destination: Hashable {
     case home(HomeRoute)
     case history(HistoryRoute)
+    case pdfDetail(DocumentDTO)
+    case pdfEditor(DocumentDTO)
+    case pdfConverter(DocumentDTO)
 }
 
 extension Destination: AppDesination {
@@ -68,6 +71,12 @@ extension Destination: AppDesination {
             r.makeView()
         case .history(let r):
             r.makeView()
+        case .pdfDetail(let document):
+            PDFDetailedPreview(document: document)
+        case .pdfEditor(let document):
+            PDFEditorScreen(document: document)
+        case .pdfConverter(let document):
+            PDFConversionScreen(document: document)
         }
     }
 }

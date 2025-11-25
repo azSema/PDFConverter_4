@@ -7,11 +7,15 @@ import PDFKit
 final class EditViewModel: ObservableObject {
     
     @Published var documents: [DocumentDTO] = []
-    @Published var selectedDocuments: Set<String> = []
     @Published var isLoading = false
     @Published var showFilePicker = false
-    @Published var editingDocument: DocumentDTO?
     @Published var showDocumentDetail = false
+    @Published var editingDocument: DocumentDTO?
+    
+    // PDF Editor
+    @Published var showPDFEditor = false
+    @Published var selectedDocumentForEdit: DocumentDTO?
+    @Published var pdfEditService = PDFEditService()
     
     weak var storage: PDFConverterStorage?
     private var cancellables = Set<AnyCancellable>()
@@ -28,15 +32,23 @@ final class EditViewModel: ObservableObject {
     private func setupBindings() {
         cancellables.removeAll()
         
-        guard let storage = storage else { return }
+        guard let storage else { return }
         
         storage.$documents
+            .map { documents in
+                documents.filter { $0.type == .pdf }
+            }
             .receive(on: DispatchQueue.main)
             .assign(to: \.documents, on: self)
             .store(in: &cancellables)
+        
+        storage.$isLoading
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.isLoading, on: self)
+            .store(in: &cancellables)
     }
     
-    // MARK: - Public Methods
+    // MARK: - Document Management
     
     func handleFileSelection() {
         showFilePicker = true
@@ -69,29 +81,18 @@ final class EditViewModel: ObservableObject {
         showDocumentDetail = true
     }
     
-    func deleteDocuments() {
-        guard let storage = storage else { return }
-        for documentId in selectedDocuments {
-            if let document = documents.first(where: { $0.id == documentId }) {
-                storage.removeDocument(document)
-            }
-        }
-        selectedDocuments.removeAll()
+    // MARK: - PDF Editor Actions
+    
+    func openPDFEditor(for document: DocumentDTO) {
+        selectedDocumentForEdit = document
+        showPDFEditor = true
     }
     
-    func toggleDocumentSelection(_ documentId: String) {
-        if selectedDocuments.contains(documentId) {
-            selectedDocuments.remove(documentId)
-        } else {
-            selectedDocuments.insert(documentId)
-        }
+    func handleQuickEdit(_ document: DocumentDTO) {
+        openPDFEditor(for: document)
     }
     
-    func clearSelection() {
-        selectedDocuments.removeAll()
-    }
-    
-    // MARK: - Private Methods
+    // MARK: - Private Import Methods
     
     private func importPDFDocument(from url: URL) async throws {
         guard let storage = storage else {
@@ -137,35 +138,5 @@ final class EditViewModel: ObservableObject {
         let fileName = url.deletingPathExtension().lastPathComponent
         let document = try await storage.convertImagesToPDF([image], fileName: fileName)
         // Document is automatically saved in convertImagesToPDF
-    }
-}
-
-// MARK: - Edit Types
-
-enum EditableFileType: String, CaseIterable {
-    case pdf = "PDF"
-    case image = "Image" 
-    case text = "Text"
-    
-    var allowedContentTypes: [UTType] {
-        switch self {
-        case .pdf:
-            return [.pdf]
-        case .image:
-            return [.image]
-        case .text:
-            return [.plainText, .text]
-        }
-    }
-    
-    var iconName: String {
-        switch self {
-        case .pdf:
-            return "doc.fill"
-        case .image:
-            return "photo.fill"
-        case .text:
-            return "doc.text.fill"
-        }
     }
 }

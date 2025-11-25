@@ -11,17 +11,49 @@ struct ConvertView: View {
         ScrollView {
             VStack(spacing: 20) {
                 
-                HStack(spacing: 12) {
-                    ConvertOptionCard(option: .textToPDF, action: viewModel.handleTextToPDF)
-                
-                    ConvertOptionCard(option: .imageToPDF, action: viewModel.handleImageToPDF)
+                VStack(spacing: 16) {
+                    HStack(spacing: 12) {
+                        ConvertOptionCard(option: .textToPDF, action: viewModel.handleTextToPDF)
+                    
+                        ConvertOptionCard(option: .imageToPDF, action: viewModel.handleImageToPDF)
 
-                    ConvertOptionCard(option: .pdfToImage, action: viewModel.handlePDFToImage)
+                        ConvertOptionCard(option: .pdfToImage, action: viewModel.handlePDFToImage)
+                    }
+                    
+                    Button {
+                        viewModel.handlePDFImport()
+                    } label: {
+                        HStack(spacing: 24) {
+                            FileType.pdf.icon
+                            
+                            Text("Import PDF")
+                                .foregroundStyle(.appBlack)
+                                .font(.medium(13))
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(16)
+                        .background(.appWhite)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(.appGray, lineWidth: 1)
+                        }
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                        .shadow(color: .appBlack.opacity(0.1), radius: 4, y: 1)
+                    }
+                                        
                 }
                 
                 if viewModel.filteredDocuments.isEmpty {
                     if viewModel.documents.isEmpty {
                         emptyState
+                    } else if viewModel.documents.isEmpty && viewModel.isLoading {
+                        ZStack {
+                            emptyState
+                            ProgressView()
+                        }
                     } else {
                         noResultsState
                     }
@@ -30,12 +62,15 @@ struct ConvertView: View {
                 }
             }
         }
+        .animation(.easeIn, value: viewModel.filteredDocuments)
         .frame(maxWidth: .infinity)
         .padding(.top, 130)
         .background(Color.appWhite)
         .overlay(alignment: .top, content: { toolbar })
         .overlay {
-            if viewModel.isConverting {
+            if viewModel.isLoading {
+                LoadingView()
+            } else if viewModel.isConverting {
                 ConvertProgressView(progress: viewModel.convertProgress)
             }
         }
@@ -64,6 +99,13 @@ struct ConvertView: View {
             PDFPickerSheet { url in
                 Task {
                     await viewModel.convertPDFToImages(fileURL: url)
+                }
+            }
+        }
+        .sheet(isPresented: $viewModel.showPDFImportPicker) {
+            PDFPickerSheet { url in
+                Task {
+                    await viewModel.importPDFDocument(fileURL: url)
                 }
             }
         }
@@ -165,8 +207,8 @@ struct ConvertView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .padding(.horizontal)
+        .padding(.bottom, 80)
     }
 }
 

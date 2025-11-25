@@ -11,6 +11,7 @@ final class ConvertViewModel: ObservableObject {
     @Published var isConverting = false
     @Published var convertProgress: Double = 0
     @Published var showFilePicker = false
+    @Published var showPDFImportPicker = false
     @Published var showImagePicker = false
     @Published var showTextFilePicker = false
     @Published var showTextEditor = false
@@ -18,6 +19,7 @@ final class ConvertViewModel: ObservableObject {
     @Published var showSuccessAlert = false
     @Published var conversionError: String?
     @Published var documents: [DocumentDTO] = []
+    @Published var isLoading = false
     @Published var showPDFPreview = false
     @Published var selectedDocument: DocumentDTO?
     
@@ -65,6 +67,11 @@ final class ConvertViewModel: ObservableObject {
             .assign(to: \.documents, on: self)
             .store(in: &cancellables)
         
+        storage.$isLoading
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.isLoading, on: self)
+            .store(in: &cancellables)
+        
         conversionService.$conversionProgress
             .receive(on: DispatchQueue.main)
             .assign(to: &$convertProgress)
@@ -90,6 +97,10 @@ final class ConvertViewModel: ObservableObject {
     
     func handlePDFToImage() {
         showFilePicker = true
+    }
+    
+    func handlePDFImport() {
+        showPDFImportPicker = true
     }
     
     func convertTextToPDF(text: String, fileName: String) async {
@@ -301,6 +312,40 @@ final class ConvertViewModel: ObservableObject {
     func openDocument(_ document: DocumentDTO) {
         selectedDocument = document
         showPDFPreview = true
+    }
+    
+    func importPDFDocument(fileURL: URL) async {
+        guard let storage = storage else {
+            conversionError = "Storage not available"
+            return
+        }
+        
+        do {
+            // Create PDF document from file URL
+            guard let pdfDocument = PDFDocument(url: fileURL) else {
+                conversionError = "Failed to read PDF file"
+                return
+            }
+            
+            let fileName = fileURL.deletingPathExtension().lastPathComponent
+            
+            let document = DocumentDTO(
+                id: UUID().uuidString,
+                pdf: pdfDocument,
+                name: fileName,
+                type: .pdf,
+                date: Date(),
+                url: fileURL,
+                isFavorite: false
+            )
+            
+            try await storage.saveDocument(document)
+            convertedDocument = document
+            showSuccessAlert = true
+            
+        } catch {
+            conversionError = error.localizedDescription
+        }
     }
 }
 

@@ -49,7 +49,17 @@ struct EditView: View {
         }
         .sheet(isPresented: $viewModel.showDocumentDetail) {
             if let document = viewModel.editingDocument {
-                DocumentDetailView(document: document)
+                PDFDetailedPreview(document: document)
+            }
+        }
+        .fullScreenCover(isPresented: $viewModel.showPDFEditor) {
+            if let document = viewModel.selectedDocumentForEdit,
+               let pdfDocument = document.pdf,
+               let storage = viewModel.storage {
+                PDFEditorView(
+                    document: pdfDocument,
+                    storage: storage
+                )
             }
         }
     }
@@ -94,58 +104,25 @@ struct DocumentsListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with selection controls
-            if !viewModel.selectedDocuments.isEmpty {
-                SelectionToolbar()
-            }
-            
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(viewModel.documents) { document in
-                        DocumentRowView(document: document) {
-                            viewModel.openDocument(document)
-                        }
-                    }
-                }
+                        DocumentRowViewWithEdit(
+                            document: document,
+                            onTap: { viewModel.openDocument(document) },
+                            onQuickEdit: { viewModel.handleQuickEdit(document) }
+                        )
+    }
+}
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
+                .padding(.bottom, 80)
             }
         }
     }
 }
 
 // MARK: - Selection Toolbar
-
-struct SelectionToolbar: View {
-    @EnvironmentObject private var viewModel: EditViewModel
-    
-    var body: some View {
-        HStack {
-            Button("Cancel") {
-                viewModel.clearSelection()
-            }
-            .foregroundColor(Color.appWhite)
-            
-            Spacer()
-            
-            Text("\(viewModel.selectedDocuments.count) selected")
-                .font(.medium(16))
-                .foregroundColor(Color.appGray)
-            
-            Spacer()
-            
-            Button {
-                viewModel.deleteDocuments()
-            } label: {
-                Image(systemName: "trash")
-                    .foregroundColor(.red)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.appWhite)
-    }
-}
 
 // MARK: - Document Type Picker
 
@@ -205,38 +182,111 @@ struct DocumentTypePickerSheet: View {
     }
 }
 
-// MARK: - Document Detail View
 
-struct DocumentDetailView: View {
-    let document: DocumentDTO
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Document editing functionality coming soon")
-                    .font(.regular(16))
-                    .foregroundColor(Color.appGray)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                
-                Spacer()
-            }
-            .navigationTitle(document.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color.appWhite)
-                }
-            }
-        }
-    }
-}
 
 #Preview {
     EditView()
-        .environmentObject(PDFConverterStorage())
+}
+
+// MARK: - Document Row View with Edit Button
+
+struct DocumentRowViewWithEdit: View {
+    let document: DocumentDTO
+    let onTap: () -> Void
+    let onQuickEdit: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            
+            // Document thumbnail with type indicator
+            ZStack(alignment: .bottomTrailing) {
+                Image(uiImage: document.thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 64, height: 80)
+                    .clipped()
+                    .background(Color.appGray.opacity(0.1))
+                    .cornerRadius(8)
+                
+                // Use FileType icon instead of text badge
+                document.type.icon
+                    .offset(x: -4, y: -4)
+            }
+            
+            // Document info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(document.name)
+                    .font(.semibold(16))
+                    .foregroundColor(.appBlack)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12))
+                            .foregroundColor(.appGray)
+                        
+                        Text(document.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.regular(12))
+                            .foregroundColor(.appGray)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text(document.type.name.uppercased())
+                            .font(.semibold(10))
+                            .foregroundColor(typeColor)
+                    }
+                    
+                    if document.isFavorite {
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.appRed)
+                        }
+                    }
+                }
+            }
+            
+            Spacer(minLength: 0)
+            
+            // Quick edit button
+            Button(action: onQuickEdit) {
+                HStack(spacing: 6) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Edit")
+                        .font(.semiBold(12))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.appBlue)
+                .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(16)
+        .background(.appWhite)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.appStroke, lineWidth: 1)
+        )
+        .shadow(color: .appBlack.opacity(0.04), radius: 4, x: 0, y: 2)
+        .onTapGesture {
+            onTap()
+        }
+    }
+    
+    private var typeColor: Color {
+        switch document.type {
+        case .pdf:
+            return .appRed
+        case .image:
+            return .appOrange
+        case .text:
+            return .appBlue
+        }
+    }
 }

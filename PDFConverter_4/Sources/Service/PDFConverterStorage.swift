@@ -160,12 +160,22 @@ final class PDFConverterStorage: ObservableObject {
     }
     
     func convertImagesToPDF(_ images: [UIImage], fileName: String) async throws -> DocumentDTO {
+        print("🔄 Converting \(images.count) images to PDF with name: \(fileName)")
+        
         let pdfDocument = PDFDocument()
         
         for (index, image) in images.enumerated() {
             if let page = PDFPage(image: image) {
                 pdfDocument.insert(page, at: index)
+                print("✅ Added page \(index + 1) to PDF")
+            } else {
+                print("❌ Failed to create PDF page from image \(index + 1)")
             }
+        }
+        
+        guard pdfDocument.pageCount > 0 else {
+            print("❌ PDF document has no pages")
+            throw PDFConverterStorageError.conversionFailed
         }
         
         let documentDTO = DocumentDTO(
@@ -178,7 +188,9 @@ final class PDFConverterStorage: ObservableObject {
             isFavorite: false
         )
         
+        print("💾 Saving document with ID: \(documentDTO.id)")
         try await saveDocument(documentDTO)
+        print("✅ Document saved successfully!")
         return documentDTO
     }
     
@@ -370,6 +382,33 @@ final class PDFConverterStorage: ObservableObject {
         }
         
         return metadata
+    }
+    
+    // MARK: - PDF Document Saving
+    
+    func savePDFDocument(_ pdfDocument: PDFDocument, name: String) async throws -> DocumentDTO {
+        let fileName = "\(name).pdf"
+        let fileURL = documentsDirectory.appendingPathComponent(fileName)
+        
+        // Write PDF to file
+        guard pdfDocument.write(to: fileURL) else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
+        // Create document DTO
+        let document = DocumentDTO(
+            pdf: pdfDocument,
+            name: name,
+            type: .pdf,
+            date: Date(),
+            url: fileURL,
+            isFavorite: false
+        )
+        
+        // Save document
+        try await saveDocument(document)
+        
+        return document
     }
 }
 

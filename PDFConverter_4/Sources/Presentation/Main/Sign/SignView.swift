@@ -49,7 +49,55 @@ struct SignView: View {
         }
         .sheet(isPresented: $viewModel.showDocumentDetail) {
             if let document = viewModel.editingDocument {
-                DocumentSignView(document: document)
+                PDFDetailedPreview(document: document)
+            }
+        }
+        .sheet(isPresented: $viewModel.showSignatureCreator) {
+            SignatureCreatorView(
+                onSave: { signature in
+                    viewModel.handleQuickSignatureCreated(signature)
+                },
+                onCancel: {
+                    viewModel.showSignatureCreator = false
+                    viewModel.selectedDocumentForSigning = nil
+                }
+            )
+        }
+        .confirmationDialog("Quick Sign", isPresented: $viewModel.showQuickSignMenu) {
+            Button("Create New Signature") {
+                if let document = viewModel.selectedDocumentForSigning {
+                    viewModel.createNewSignature(for: document)
+                }
+            }
+            
+            if !viewModel.signatureStorage.savedSignatures.isEmpty {
+                ForEach(viewModel.signatureStorage.savedSignatures.prefix(3)) { signature in
+                    Button("Use '\(signature.name)'") {
+                        if let document = viewModel.selectedDocumentForSigning {
+                            viewModel.applyExistingSignature(signature, to: document)
+                        }
+                    }
+                }
+                
+                if viewModel.signatureStorage.savedSignatures.count > 3 {
+                    Button("More Signatures...") {
+                        // Open signature selector
+                        viewModel.showSignatureCreator = true
+                    }
+                }
+            }
+            
+            Button("Cancel", role: .cancel) {
+                viewModel.selectedDocumentForSigning = nil
+            }
+        } message: {
+            if let document = viewModel.selectedDocumentForSigning {
+                Text("Choose how to sign '\(document.name)'")
+            }
+        }
+        .overlay {
+            if viewModel.isLoading {
+                LoadingView()
             }
         }
     }
@@ -109,7 +157,108 @@ struct EmptySignState: View {
     }
 }
 
-// MARK: - Documents List (Reused from Edit)
+// MARK: - Document Row View with Quick Sign
+
+struct DocumentRowViewWithSignature: View {
+    let document: DocumentDTO
+    let onTap: () -> Void
+    let onQuickSign: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            
+            // Document thumbnail with type indicator
+            ZStack(alignment: .bottomTrailing) {
+                Image(uiImage: document.thumbnail)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 64, height: 80)
+                    .clipped()
+                    .background(Color.appGray.opacity(0.1))
+                    .cornerRadius(8)
+                
+                // Use FileType icon instead of text badge
+                document.type.icon
+                    .offset(x: -4, y: -4)
+            }
+            
+            // Document info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(document.name)
+                    .font(.semibold(16))
+                    .foregroundColor(.appBlack)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12))
+                            .foregroundColor(.appGray)
+                        
+                        Text(document.date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.regular(12))
+                            .foregroundColor(.appGray)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text(document.type.name.uppercased())
+                            .font(.semibold(10))
+                            .foregroundColor(typeColor)
+                    }
+                    
+                    if document.isFavorite {
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.appRed)
+                        }
+                    }
+                }
+            }
+            
+            Spacer(minLength: 0)
+            
+            // Quick sign button
+            Button(action: onQuickSign) {
+                HStack(spacing: 6) {
+                    Image(systemName: "signature")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Sign")
+                        .font(.semiBold(12))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.appRed)
+                .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(16)
+        .background(.appWhite)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.appStroke, lineWidth: 1)
+        )
+        .shadow(color: .appBlack.opacity(0.04), radius: 4, x: 0, y: 2)
+        .onTapGesture {
+            onTap()
+        }
+    }
+    
+    private var typeColor: Color {
+        switch document.type {
+        case .pdf:
+            return .appRed
+        case .image:
+            return .appOrange
+        case .text:
+            return .appBlue
+        }
+    }
+}
 
 extension SignView {
     
@@ -118,48 +267,22 @@ extension SignView {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(viewModel.documents) { document in
-                        DocumentRowView(document: document) {
-                            viewModel.openDocument(document)
-                        }
+                        DocumentRowViewWithSignature(
+                            document: document,
+                            onTap: { viewModel.openDocument(document) },
+                            onQuickSign: { viewModel.showQuickSignOptions(for: document) }
+                        )
                     }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
+                .padding(.bottom, 80)
             }
         }
     }
 }
 
-// MARK: - Document Sign View
 
-struct DocumentSignView: View {
-    let document: DocumentDTO
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                Text("Document signing functionality coming soon")
-                    .font(.regular(16))
-                    .foregroundColor(Color.appGray)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                
-                Spacer()
-            }
-            .navigationTitle("Sign Document")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color.appRed)
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Document Type Picker (Reused from Edit)
 

@@ -20,7 +20,11 @@ final class ScannerViewModel: ObservableObject {
         // Bind scanner service properties to view model
         scannerService.$scannedImages
             .receive(on: DispatchQueue.main)
-            .assign(to: &$scannedImages)
+            .sink { [weak self] images in
+                print("🔄 ScannerViewModel received \(images.count) images from ScannerService")
+                self?.scannedImages = images
+            }
+            .store(in: &cancellables)
         
         scannerService.$isProcessing
             .receive(on: DispatchQueue.main)

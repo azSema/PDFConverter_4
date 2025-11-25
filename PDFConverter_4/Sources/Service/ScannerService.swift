@@ -39,11 +39,17 @@ final class ScannerService: ObservableObject {
     }
     
     func handleScanCompleted(images: [UIImage]) {
-        print("Scan completed with \(images.count) images")
+        print("📸 Scan completed with \(images.count) images")
+        
+        // Log image details
+        for (index, image) in images.enumerated() {
+            print("🖼️ Image \(index + 1): Size = \(image.size), Scale = \(image.scale)")
+        }
         
         scannedImages = images
         state = .processing
         isProcessing = true
+        print("📋 Updated scannedImages array with \(scannedImages.count) images")
         
         // Simulate processing time
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -119,9 +125,9 @@ final class ScannerService: ObservableObject {
     
     private func completeScanProcessing(images: [UIImage]) {
         state = .completed(images)
-        print("Scan processing completed with \(images.count) pages")
-        
-        // TODO: Integrate with PDFConverterStorage to save scanned documents
+        isProcessing = false
+        print("✅ Scan processing completed with \(images.count) pages")
+        print("📊 Final scannedImages count in ScannerService: \(scannedImages.count)")
     }
 }
 

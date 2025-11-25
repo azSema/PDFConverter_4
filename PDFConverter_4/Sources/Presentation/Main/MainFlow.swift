@@ -58,35 +58,42 @@ struct MainFlow: View {
     }
     
     var body: some View {
-        TabView(selection: $router.selectedTab) {
-             
-             ConvertView()
-                 .tag(AppTab.convert)
-             
-             EditView()
-                 .tag(AppTab.edit)
-             
-            EmptyView()
-                 .tag(AppTab.scan)
-             
-             SignView()
-                 .tag(AppTab.sign)
-             
-             SettingsView()
-                 .tag(AppTab.settings)
-         }
-         .overlay(
-             VStack {
-                 Spacer()
-                 CustomTabBar(selectedTab: $router.selectedTab)
+        NavigationStack(path: $router.path) {
+            TabView(selection: $router.selectedTab) {
+                 
+                 ConvertView()
+                     .tag(AppTab.convert)
+                 
+                 EditView()
+                     .tag(AppTab.edit)
+                 
+                EmptyView()
+                     .tag(AppTab.scan)
+                 
+                 SignView()
+                     .tag(AppTab.sign)
+                 
+                 SettingsView()
+                     .tag(AppTab.settings)
              }
-         )
-         .ignoresSafeArea(.all, edges: .bottom)
-         .fullScreenCover(isPresented: $router.isShowingScanner) {
-             FullScreenScannerView()
-                 .environmentObject(router)
-                 .environmentObject(pdfStorage)
-         }
+             .navigationDestination(for: Destination.self) { destination in
+                 destination.makeView()
+                     .environmentObject(pdfStorage)
+                     .environmentObject(router)
+             }
+             .overlay(
+                 VStack {
+                     Spacer()
+                     CustomTabBar(selectedTab: $router.selectedTab)
+                 }
+             )
+             .ignoresSafeArea(.all, edges: .bottom)
+             .fullScreenCover(isPresented: $router.isShowingScanner) {
+                 FullScreenScannerView()
+                     .environmentObject(router)
+                     .environmentObject(pdfStorage)
+             }
+        }
      }
     
 }

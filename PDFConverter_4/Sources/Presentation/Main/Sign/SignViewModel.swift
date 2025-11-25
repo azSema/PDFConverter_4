@@ -12,6 +12,12 @@ final class SignViewModel: ObservableObject {
     @Published var showDocumentDetail = false
     @Published var editingDocument: DocumentDTO?
     
+    // Signature functionality
+    @Published var showSignatureCreator = false
+    @Published var showQuickSignMenu = false
+    @Published var selectedDocumentForSigning: DocumentDTO?
+    @Published var signatureStorage = SignatureStorage()
+    
     weak var storage: PDFConverterStorage?
     private var cancellables = Set<AnyCancellable>()
     
@@ -30,12 +36,20 @@ final class SignViewModel: ObservableObject {
         guard let storage = storage else { return }
         
         storage.$documents
+            .map { documents in
+                documents.filter { $0.type == .pdf }
+            }
             .receive(on: DispatchQueue.main)
             .assign(to: \.documents, on: self)
             .store(in: &cancellables)
+        
+        storage.$isLoading
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.isLoading, on: self)
+            .store(in: &cancellables)
     }
     
-    // MARK: - Public Methods
+    // MARK: - Document Management
     
     func handleFileSelection() {
         showFilePicker = true
@@ -68,7 +82,93 @@ final class SignViewModel: ObservableObject {
         showDocumentDetail = true
     }
     
-    // MARK: - Private Methods
+    // MARK: - Quick Signature Actions
+    
+    func showQuickSignOptions(for document: DocumentDTO) {
+        selectedDocumentForSigning = document
+        showQuickSignMenu = true
+    }
+    
+    func createNewSignature(for document: DocumentDTO) {
+        selectedDocumentForSigning = document
+        showSignatureCreator = true
+    }
+    
+    func applySignature(_ signature: UIImage, to document: DocumentDTO) {
+        Task {
+            do {
+                let signedDocument = try await addSignatureToPDF(document, signature: signature)
+                print("✅ Signature applied to document: \(signedDocument.name)")
+                
+                // Refresh documents list
+                storage?.loadDocuments()
+                
+            } catch {
+                print("❌ Failed to apply signature: \(error)")
+            }
+        }
+    }
+    
+    func applyExistingSignature(_ savedSignature: SavedSignature, to document: DocumentDTO) {
+        guard let signatureImage = signatureStorage.loadSignatureImage(savedSignature) else {
+            print("❌ Failed to load signature image")
+            return
+        }
+        
+        applySignature(signatureImage, to: document)
+    }
+    
+    // MARK: - Quick Signature Creation
+    
+    func handleQuickSignatureCreated(_ signature: UIImage) {
+        guard let document = selectedDocumentForSigning else { return }
+        
+        showSignatureCreator = false
+        selectedDocumentForSigning = nil
+        
+        // Apply signature directly
+        applySignature(signature, to: document)
+    }
+    
+    // MARK: - PDF Signature Addition
+    
+    private func addSignatureToPDF(_ document: DocumentDTO, signature: UIImage) async throws -> DocumentDTO {
+        guard let pdfDocument = document.pdf,
+              let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
+        // Get first page for signature placement
+        guard let firstPage = pdfDocument.page(at: 0) else {
+            throw PDFConverterStorageError.invalidPDF
+        }
+        
+        let pageRect = firstPage.bounds(for: .mediaBox)
+        
+        // Place signature in bottom right corner
+        let signatureWidth: CGFloat = 120
+        let signatureHeight: CGFloat = 60
+        let margin: CGFloat = 20
+        
+        let signatureRect = CGRect(
+            x: pageRect.width - signatureWidth - margin,
+            y: margin, // Bottom of page (PDF coordinates)
+            width: signatureWidth,
+            height: signatureHeight
+        )
+        
+        // Create image annotation
+        let annotation = ImageAnnotation(bounds: signatureRect, image: signature)
+        firstPage.addAnnotation(annotation)
+        
+        // Save as new document
+        let fileName = "\(document.name)_signed_\(Date().timeIntervalSince1970)"
+        let signedDocument = try await storage.savePDFDocument(pdfDocument, name: fileName)
+        
+        return signedDocument
+    }
+    
+    // MARK: - Private Import Methods
     
     private func importPDFDocument(from url: URL) async throws {
         guard let storage = storage else {

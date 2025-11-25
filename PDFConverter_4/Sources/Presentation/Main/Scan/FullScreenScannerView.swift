@@ -11,36 +11,49 @@ struct FullScreenScannerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            if viewModel.isSupported {
-                VStack(spacing: 0) {
-                    // Header with close button
-                    headerView
-                    
+            VStack {
+                headerView
+                
+                if viewModel.isSupported {
                     if viewModel.scannedImages.isEmpty {
-                        // Empty state - start scanning automatically
                         emptyStateView
+                            .onAppear { print("🔍 UI State: Showing empty state view") }
                     } else {
-                        // Show scanned images and options
                         scannedImagesView
+                            .onAppear { print("📱 UI State: Showing scanned images view with \(viewModel.scannedImages.count) images") }
                     }
+                } else {
+                    unsupportedDeviceView
+                        .onAppear { print("❌ UI State: Device not supported") }
                 }
-            } else {
-                unsupportedDeviceView
             }
             
             // Processing overlay
             if viewModel.isProcessing {
                 processingOverlay
+                    .onAppear { print("⏳ UI State: Showing processing overlay") }
             }
         }
         .onAppear {
+            print("👀 FullScreenScannerView appeared")
+            print("📊 isSupported: \(viewModel.isSupported), scannedImages count: \(viewModel.scannedImages.count)")
+            
             if viewModel.isSupported && viewModel.scannedImages.isEmpty {
+                print("🚀 Starting scanning...")
                 viewModel.startScanning()
             }
         }
         .sheet(isPresented: $viewModel.isShowingScanner) {
             DocumentCameraScannerView(
-                onScanCompleted: viewModel.handleScanCompleted,
+                onScanCompleted: { images in
+                    print("🔄 System Save button tapped! Got \(images.count) images")
+                    viewModel.handleScanCompleted(images: images)
+                    
+                    // Automatically save when user taps system Save button
+                    Task {
+                        await saveScannedDocument()
+                    }
+                },
                 onScanCancelled: { 
                     viewModel.handleScanCancelled()
                     router.dismissScanner()
@@ -77,6 +90,7 @@ extension FullScreenScannerView {
             
             if !viewModel.scannedImages.isEmpty {
                 Button("Save") {
+                    print("💾 Header Save button tapped!")
                     Task {
                         await saveScannedDocument()
                     }
@@ -222,6 +236,7 @@ extension FullScreenScannerView {
                 .padding(.horizontal, 20)
                 
                 Button(action: {
+                    print("💾 Bottom Save Document button tapped!")
                     Task {
                         await saveScannedDocument()
                     }
@@ -291,12 +306,42 @@ extension FullScreenScannerView {
     // MARK: - Private Methods
     
     private func saveScannedDocument() async {
-        guard !viewModel.scannedImages.isEmpty else { return }
+        guard !viewModel.scannedImages.isEmpty else {
+            print("❌ No scanned images to save")
+            return
+        }
         
-        // TODO: Implement saving to PDFConverterStorage
-        // For now, just simulate saving and close
-        await MainActor.run {
-            router.dismissScanner()
+        print("🚀 Starting to save \(viewModel.scannedImages.count) scanned images...")
+        
+        do {
+            viewModel.isProcessing = true
+            
+            // Create PDF from scanned images
+            let fileName = "Scanned Document \(Date().formatted(date: .numeric, time: .omitted))"
+            print("📄 Creating PDF with name: \(fileName)")
+            
+            let savedDocument = try await pdfStorage.convertImagesToPDF(viewModel.scannedImages, fileName: fileName)
+            print("✅ Document saved with ID: \(savedDocument.id)")
+            
+            await MainActor.run {
+                viewModel.isProcessing = false
+                print("🔄 Dismissing scanner...")
+                
+                // First dismiss scanner
+                router.dismissScanner()
+                
+                // Then navigate to detail view with a slight delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    print("🧭 Navigating to PDF detail view...")
+                    router.push(.pdfDetail(savedDocument))
+                }
+            }
+        } catch {
+            await MainActor.run {
+                viewModel.isProcessing = false
+                print("❌ Failed to save scanned document: \(error.localizedDescription)")
+                router.dismissScanner()
+            }
         }
     }
 }
