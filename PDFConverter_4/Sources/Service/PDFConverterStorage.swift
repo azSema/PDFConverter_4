@@ -8,12 +8,16 @@ struct DocumentMetadata: Codable {
     var name: String
     var isFavorite: Bool
     let dateCreated: Date
+    let type: FileType
+    let sourcePDFURL: URL?
     
-    init(id: String, name: String, isFavorite: Bool = false, dateCreated: Date = Date()) {
+    init(id: String, name: String, isFavorite: Bool = false, dateCreated: Date = Date(), type: FileType = .pdf, sourcePDFURL: URL? = nil) {
         self.id = id
         self.name = name
         self.isFavorite = isFavorite
         self.dateCreated = dateCreated
+        self.type = type
+        self.sourcePDFURL = sourcePDFURL
     }
 }
 
@@ -35,7 +39,6 @@ final class PDFConverterStorage: ObservableObject {
         
         createDocumentsDirectoryIfNeeded()
         loadDocuments()
-        loadSampleDocuments()
     }
     
     // MARK: - Public Methods
@@ -74,16 +77,42 @@ final class PDFConverterStorage: ObservableObject {
     }
     
     func saveDocument(_ document: DocumentDTO) async throws {
-        guard let pdfDocument = document.pdf else {
-            throw PDFConverterStorageError.invalidPDF
-        }
+        let fileName: String
+        let fileURL: URL
         
-        let fileName = "\(document.id).pdf"
-        let fileURL = documentsDirectory.appendingPathComponent(fileName)
-        
-        // Save PDF to documents directory
-        guard pdfDocument.write(to: fileURL) else {
-            throw PDFConverterStorageError.saveFailed
+        switch document.type {
+        case .pdf:
+            guard let pdfDocument = document.pdf else {
+                throw PDFConverterStorageError.invalidPDF
+            }
+            fileName = "\(document.id).pdf"
+            fileURL = documentsDirectory.appendingPathComponent(fileName)
+            
+            // Save PDF to documents directory
+            guard pdfDocument.write(to: fileURL) else {
+                throw PDFConverterStorageError.saveFailed
+            }
+            
+        case .image:
+            guard let existingURL = document.url else {
+                throw PDFConverterStorageError.saveFailed
+            }
+            fileName = "\(document.id).jpg"
+            fileURL = documentsDirectory.appendingPathComponent(fileName)
+            
+            // Copy image file to documents directory
+            try FileManager.default.copyItem(at: existingURL, to: fileURL)
+            
+        case .text:
+            fileName = "\(document.id).txt"
+            fileURL = documentsDirectory.appendingPathComponent(fileName)
+            
+            if let existingURL = document.url {
+                // Copy text file to documents directory
+                try FileManager.default.copyItem(at: existingURL, to: fileURL)
+            } else {
+                throw PDFConverterStorageError.saveFailed
+            }
         }
         
         // Update document with file URL
@@ -185,13 +214,19 @@ final class PDFConverterStorage: ObservableObject {
     func loadDocuments() {
         isLoading = true
         
+        // Clear existing documents to avoid duplicates
+        documents.removeAll()
+        
         // Load documents from documents directory
         do {
             let fileURLs = try fileManager.contentsOfDirectory(
                 at: documentsDirectory,
                 includingPropertiesForKeys: [.creationDateKey],
                 options: [.skipsHiddenFiles]
-            ).filter { $0.pathExtension.lowercased() == "pdf" }
+            ).filter { url in
+                let pathExtension = url.pathExtension.lowercased()
+                return ["pdf", "jpg", "jpeg", "png", "txt", "text"].contains(pathExtension)
+            }
             
             for fileURL in fileURLs {
                 if let document = createDocumentFromFile(at: fileURL) {
@@ -200,6 +235,11 @@ final class PDFConverterStorage: ObservableObject {
             }
         } catch {
             print("Failed to load documents: \(error)")
+        }
+        
+        // Load sample documents only if no other documents exist
+        if documents.isEmpty {
+            loadSampleDocuments()
         }
         
         isLoading = false
@@ -224,8 +264,6 @@ final class PDFConverterStorage: ObservableObject {
     }
     
     private func createDocumentFromFile(at url: URL) -> DocumentDTO? {
-        guard let pdfDocument = PDFDocument(url: url) else { return nil }
-        
         let documentId = url.deletingPathExtension().lastPathComponent
         let attributes = try? fileManager.attributesOfItem(atPath: url.path)
         let creationDate = attributes?[.creationDate] as? Date ?? Date()
@@ -233,14 +271,37 @@ final class PDFConverterStorage: ObservableObject {
         // Load metadata if exists, otherwise use filename
         let metadata = loadDocumentMetadata(for: documentId)
         
+        // Determine file type based on extension
+        let fileExtension = url.pathExtension.lowercased()
+        let fileType: FileType
+        
+        switch fileExtension {
+        case "pdf":
+            fileType = .pdf
+        case "jpg", "jpeg", "png":
+            fileType = .image
+        case "txt", "text":
+            fileType = .text
+        default:
+            fileType = metadata?.type ?? .pdf
+        }
+        
+        // Load PDF document if it's a PDF file
+        var pdfDocument: PDFDocument?
+        if fileType == .pdf {
+            pdfDocument = PDFDocument(url: url)
+            guard pdfDocument != nil else { return nil }
+        }
+        
         return DocumentDTO(
             id: documentId,
             pdf: pdfDocument,
             name: metadata?.name ?? url.deletingPathExtension().lastPathComponent,
-            type: .pdf,
+            type: metadata?.type ?? fileType,
             date: metadata?.dateCreated ?? creationDate,
             url: url,
-            isFavorite: metadata?.isFavorite ?? false
+            isFavorite: metadata?.isFavorite ?? false,
+            sourcePDFURL: metadata?.sourcePDFURL
         )
     }
     
@@ -290,7 +351,9 @@ final class PDFConverterStorage: ObservableObject {
             id: document.id,
             name: document.name,
             isFavorite: document.isFavorite,
-            dateCreated: document.date
+            dateCreated: document.date,
+            type: document.type,
+            sourcePDFURL: document.sourcePDFURL
         )
         
         let metadataURL = metadataDirectory.appendingPathComponent("\(document.id).json")

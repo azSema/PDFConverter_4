@@ -13,32 +13,30 @@ final class EditViewModel: ObservableObject {
     @Published var editingDocument: DocumentDTO?
     @Published var showDocumentDetail = false
     
-    private let storage: PDFConverterStorage
+    weak var storage: PDFConverterStorage?
     private var cancellables = Set<AnyCancellable>()
     
-    init(storage: PDFConverterStorage) {
-        self.storage = storage
+    init() {
+        // Storage will be set via updateStorage
+    }
+    
+    func updateStorage(_ newStorage: PDFConverterStorage) {
+        storage = newStorage
         setupBindings()
-        loadDocuments()
     }
     
     private func setupBindings() {
+        cancellables.removeAll()
+        
+        guard let storage = storage else { return }
+        
         storage.$documents
             .receive(on: DispatchQueue.main)
             .assign(to: \.documents, on: self)
             .store(in: &cancellables)
-        
-        storage.$isLoading
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.isLoading, on: self)
-            .store(in: &cancellables)
     }
     
     // MARK: - Public Methods
-    
-    func loadDocuments() {
-        storage.loadDocuments()
-    }
     
     func handleFileSelection() {
         showFilePicker = true
@@ -72,6 +70,7 @@ final class EditViewModel: ObservableObject {
     }
     
     func deleteDocuments() {
+        guard let storage = storage else { return }
         for documentId in selectedDocuments {
             if let document = documents.first(where: { $0.id == documentId }) {
                 storage.removeDocument(document)
@@ -95,6 +94,10 @@ final class EditViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func importPDFDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         guard let pdfDocument = PDFDocument(url: url) else {
             throw PDFConverterStorageError.invalidPDF
         }
@@ -110,6 +113,10 @@ final class EditViewModel: ObservableObject {
     }
     
     private func importTextDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         let text = try String(contentsOf: url, encoding: .utf8)
         let fileName = url.deletingPathExtension().lastPathComponent
         
@@ -118,6 +125,10 @@ final class EditViewModel: ObservableObject {
     }
     
     private func importImageDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         guard let data = try? Data(contentsOf: url),
               let image = UIImage(data: data) else {
             throw PDFConverterStorageError.conversionFailed

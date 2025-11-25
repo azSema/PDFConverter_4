@@ -12,27 +12,30 @@ final class SignViewModel: ObservableObject {
     @Published var showDocumentDetail = false
     @Published var editingDocument: DocumentDTO?
     
-    private let storage: PDFConverterStorage
+    weak var storage: PDFConverterStorage?
     private var cancellables = Set<AnyCancellable>()
     
-    init(storage: PDFConverterStorage) {
-        self.storage = storage
+    init() {
+        // Storage will be set via updateStorage
+    }
+    
+    func updateStorage(_ newStorage: PDFConverterStorage) {
+        storage = newStorage
         setupBindings()
     }
     
     private func setupBindings() {
+        cancellables.removeAll()
+        
+        guard let storage = storage else { return }
+        
         storage.$documents
             .receive(on: DispatchQueue.main)
-            .assign(to: &$documents)
+            .assign(to: \.documents, on: self)
+            .store(in: &cancellables)
     }
     
     // MARK: - Public Methods
-    
-    func loadDocuments() {
-        isLoading = true
-        storage.loadDocuments()
-        isLoading = false
-    }
     
     func handleFileSelection() {
         showFilePicker = true
@@ -68,6 +71,10 @@ final class SignViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func importPDFDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         guard let pdfDocument = PDFDocument(url: url) else {
             throw PDFConverterStorageError.invalidPDF
         }
@@ -83,6 +90,10 @@ final class SignViewModel: ObservableObject {
     }
     
     private func importTextDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         let text = try String(contentsOf: url, encoding: .utf8)
         let fileName = url.deletingPathExtension().lastPathComponent
         
@@ -91,6 +102,10 @@ final class SignViewModel: ObservableObject {
     }
     
     private func importImageDocument(from url: URL) async throws {
+        guard let storage = storage else {
+            throw PDFConverterStorageError.saveFailed
+        }
+        
         guard let data = try? Data(contentsOf: url),
               let image = UIImage(data: data) else {
             throw PDFConverterStorageError.conversionFailed

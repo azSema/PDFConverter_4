@@ -18,14 +18,8 @@ struct DocumentRowView: View {
                         .background(Color.appGray.opacity(0.1))
                         .cornerRadius(8)
                     
-                    // Document type badge
-                    Text(document.type.rawValue.uppercased())
-                        .font(.semibold(9))
-                        .foregroundColor(.appWhite)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(typeColor)
-                        .cornerRadius(4)
+                    // Use FileType icon instead of text badge
+                    document.type.icon
                         .offset(x: -4, y: -4)
                 }
                 
@@ -46,6 +40,12 @@ struct DocumentRowView: View {
                             Text(document.date.formatted(date: .abbreviated, time: .omitted))
                                 .font(.regular(12))
                                 .foregroundColor(.appGray)
+                        }
+                        
+                        HStack(spacing: 4) {
+                            Text(document.type.name.uppercased())
+                                .font(.semibold(10))
+                                .foregroundColor(typeColor)
                         }
                         
                         if document.isFavorite {
@@ -85,7 +85,9 @@ struct DocumentRowView: View {
         switch document.type {
         case .pdf:
             return .appRed
-        case .doc:
+        case .image:
+            return .appOrange
+        case .text:
             return .appBlue
         }
     }
@@ -107,10 +109,21 @@ struct DocumentRowView: View {
         DocumentRowView(
             document: DocumentDTO(
                 id: "2",
-                name: "Important Document",
-                type: .doc,
+                name: "Important Image",
+                type: .image,
                 date: Date().addingTimeInterval(-86400),
                 isFavorite: true
+            ),
+            onTap: {}
+        )
+        
+        DocumentRowView(
+            document: DocumentDTO(
+                id: "3",
+                name: "Text Document",
+                type: .text,
+                date: Date().addingTimeInterval(-172800),
+                isFavorite: false
             ),
             onTap: {}
         )

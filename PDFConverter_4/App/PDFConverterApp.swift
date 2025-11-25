@@ -11,6 +11,9 @@ struct PDFConverterApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.light)
+                .environmentObject(router)
+                .environmentObject(pdfStorage)
+                .environmentObject(premium)
         }
     }
 }

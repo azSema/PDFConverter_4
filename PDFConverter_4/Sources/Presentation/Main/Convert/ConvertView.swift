@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct ConvertView: View {
     
+    @EnvironmentObject private var storage: PDFConverterStorage
     @StateObject private var viewModel = ConvertViewModel()
     @State private var inputText = ""
     
@@ -18,8 +19,14 @@ struct ConvertView: View {
                     ConvertOptionCard(option: .pdfToImage, action: viewModel.handlePDFToImage)
                 }
                 
-                if true {
-                    emptyState
+                if viewModel.filteredDocuments.isEmpty {
+                    if viewModel.documents.isEmpty {
+                        emptyState
+                    } else {
+                        noResultsState
+                    }
+                } else {
+                    documentsListView
                 }
             }
         }
@@ -30,6 +37,11 @@ struct ConvertView: View {
         .overlay {
             if viewModel.isConverting {
                 ConvertProgressView(progress: viewModel.convertProgress)
+            }
+        }
+        .sheet(isPresented: $viewModel.showTextFilePicker) {
+            TextFilePickerSheet { url in
+                viewModel.handleTextFileImport(url: url)
             }
         }
         .sheet(isPresented: $viewModel.showTextEditor) {
@@ -45,6 +57,8 @@ struct ConvertView: View {
                     await viewModel.convertImagesToPDF(images: images, fileName: "Images Document")
                 }
             }
+            .presentationDetents([.fraction(0.33)])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $viewModel.showFilePicker) {
             PDFPickerSheet { url in
@@ -52,6 +66,30 @@ struct ConvertView: View {
                     await viewModel.convertPDFToImages(fileURL: url)
                 }
             }
+        }
+        .alert("Conversion Successful", isPresented: $viewModel.showSuccessAlert) {
+            Button("OK") {
+                viewModel.dismissSuccess()
+            }
+        } message: {
+            Text("Your document has been converted successfully!")
+        }
+        .alert("Conversion Error", isPresented: .constant(viewModel.conversionError != nil)) {
+            Button("OK") {
+                viewModel.dismissError()
+            }
+        } message: {
+            if let error = viewModel.conversionError {
+                Text(error)
+            }
+        }
+        .sheet(isPresented: $viewModel.showPDFPreview) {
+            if let document = viewModel.selectedDocument {
+                PDFDetailedPreview(document: document)
+            }
+        }
+        .onAppear {
+            viewModel.updateStorage(storage)
         }
     }
     
@@ -98,25 +136,76 @@ struct ConvertView: View {
             .scaledToFit()
             .padding(30)
     }
+    
+    private var noResultsState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(.appGray.opacity(0.6))
+            
+            VStack(spacing: 8) {
+                Text("No results found")
+                    .font(.semibold(18))
+                    .foregroundColor(.appBlack)
+                
+                Text("Try adjusting your search or filter")
+                    .font(.regular(14))
+                    .foregroundColor(.appGray)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(40)
+    }
+    
+    private var documentsListView: some View {
+        LazyVStack(spacing: 16) {
+            ForEach(viewModel.filteredDocuments) { document in
+                DocumentRowView(document: document) {
+                    viewModel.openDocument(document)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+    }
 }
 
 struct ConvertProgressView: View {
     let progress: Double
     
     var body: some View {
-        VStack(spacing: 16) {
-            ProgressView(value: progress)
-                .progressViewStyle(LinearProgressViewStyle(tint: Color.appWhite))
-                .frame(width: 200)
+        ZStack {
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
             
-            Text("Converting... \(Int(progress * 100))%")
-                .font(.medium(16))
-                .foregroundColor(Color.appGray)
+            VStack(spacing: 20) {
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.badge.gearshape")
+                        .font(.system(size: 40))
+                        .foregroundColor(.appRed)
+                    
+                    Text("Converting Document")
+                        .font(.semiBold(18))
+                        .foregroundColor(.appBlack)
+                }
+                
+                VStack(spacing: 12) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: Color.appRed))
+                        .frame(width: 200)
+                        .scaleEffect(y: 2)
+                    
+                    Text("\(Int(progress * 100))% Complete")
+                        .font(.medium(14))
+                        .foregroundColor(.appGray)
+                }
+            }
+            .padding(32)
+            .background(.appWhite)
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
+            .padding(.horizontal, 40)
         }
-        .padding(24)
-        .background(Color.appRed)
-        .cornerRadius(12)
-        .shadow(radius: 10)
     }
 }
 

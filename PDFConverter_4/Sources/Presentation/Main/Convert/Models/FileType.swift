@@ -2,7 +2,7 @@ import Foundation
 import UniformTypeIdentifiers
 import SwiftUI
 
-enum FileType: String, CaseIterable {
+enum FileType: String, CaseIterable, Codable {
     case pdf, image, text
     
     var name: String {
@@ -23,7 +23,7 @@ enum FileType: String, CaseIterable {
         case .image:
             [.jpeg, .png]
         case .text:
-            [.text]
+            [.text, .plainText, .utf8PlainText, .rtf]
         }
     }
     

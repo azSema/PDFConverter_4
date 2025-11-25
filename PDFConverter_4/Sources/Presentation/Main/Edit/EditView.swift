@@ -4,12 +4,8 @@ import UniformTypeIdentifiers
 struct EditView: View {
     
     @EnvironmentObject private var storage: PDFConverterStorage
-    @StateObject private var viewModel: EditViewModel
+    @StateObject private var viewModel = EditViewModel()
     @State private var showDocumentTypePicker = false
-    
-    init() {
-        self._viewModel = StateObject(wrappedValue: EditViewModel(storage: PDFConverterStorage()))
-    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -28,12 +24,13 @@ struct EditView: View {
             } else {
                 // Documents List
                 DocumentsListView()
+                    .padding(.top, -40)
             }
         }
         .background(Color.appWhite)
         .environmentObject(viewModel)
         .onAppear {
-            viewModel.loadDocuments()
+            viewModel.updateStorage(storage)
         }
         .sheet(isPresented: $showDocumentTypePicker) {
             DocumentTypePickerSheet { fileType in
@@ -113,23 +110,6 @@ struct DocumentsListView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
             }
-        }
-        
-        // Floating Add Button
-        .overlay(alignment: .bottomTrailing) {
-            Button {
-                viewModel.handleFileSelection()
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .background(Color.appWhite)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
         }
     }
 }

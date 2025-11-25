@@ -73,7 +73,7 @@ struct TextFilePickerSheet: View {
     
     var body: some View {
         DocumentPickerView(
-            allowedContentTypes: [.plainText, .text],
+            allowedContentTypes: FileType.text.UTTypes,
             allowsMultipleSelection: false
         ) { urls in
             if let firstUrl = urls.first {
@@ -93,9 +93,20 @@ struct ImagePickerSheet: View {
     let onImagesPicked: ([UIImage]) -> Void
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                VStack(spacing: 16) {
+        VStack(spacing: 20) {
+            // Handle indicator
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+            
+            VStack(spacing: 12) {
+                Text("Select Images")
+                    .font(.semiBold(18))
+                    .foregroundColor(.appBlack)
+                    .padding(.top, 8)
+                
+                VStack(spacing: 12) {
                     Button("Choose from Gallery") {
                         showImagePicker = true
                     }
@@ -103,36 +114,27 @@ struct ImagePickerSheet: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.appWhite)
+                    .background(Color.appRed)
                     .cornerRadius(12)
+                    .shadow(color: Color.appRed.opacity(0.3), radius: 4, x: 0, y: 2)
                     
                     Button("Choose from Files") {
                         showFilePicker = true
                     }
                     .font(.semiBold(16))
-                    .foregroundColor(Color.appWhite)
+                    .foregroundColor(Color.appRed)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(.clear)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.appWhite, lineWidth: 2)
+                            .stroke(Color.appRed, lineWidth: 2)
                     )
                 }
-                .padding(.horizontal, 16)
-                
-                Spacer()
+                .padding(.horizontal, 20)
             }
-            .navigationTitle("Select Images")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Cancel") { 
-                        dismiss() 
-                    }
-                    .foregroundColor(Color.appGray)
-                }
-            }
+            
+            Spacer(minLength: 20)
         }
         .sheet(isPresented: $showImagePicker) {
             PhotoLibraryPickerView { images in
