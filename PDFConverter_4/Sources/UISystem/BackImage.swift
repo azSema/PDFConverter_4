@@ -21,7 +21,7 @@ struct BackImage: View {
         switch deviceType {
         case .ipad:
             if orientation.isLandscape {
-                return baseName + ".hor"
+                return baseName + ".landscape"
             } else {
                 return baseName
             }

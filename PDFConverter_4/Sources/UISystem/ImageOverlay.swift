@@ -4,8 +4,8 @@ import PDFKit
 struct ImageOverlay: View {
     @ObservedObject var editService: PDFEditService
     @Binding var annotation: IdentifiablePDFAnnotation
+    @Binding var isScaling: Bool
     @State private var isDragging = false
-    @State private var isScaling = false
     @State private var showMenu = false
     
     let geometry: GeometryProxy
@@ -102,22 +102,12 @@ struct ImageOverlay: View {
                     saveImagePosition()
                 }
         )
-        .gesture(
-            MagnificationGesture()
-                .onChanged { scale in
-                    print("🔍 Image scale changed: \(scale)")
-                    let minScale: CGFloat = 0.1
-                    let maxScale: CGFloat = 5.0
-                    let clampedScale = min(max(scale, minScale), maxScale)
-                    annotation.scale = clampedScale
-                    isScaling = true
-                }
-                .onEnded { _ in
-                    print("📏 Image scale ended: \(annotation.scale)")
-                    isScaling = false
-                    saveImagePosition()
-                }
-        )
+        .onChange(of: isScaling) { scaling in
+            if !scaling {
+                // Scale ended, save position
+                saveImagePosition()
+            }
+        }
     }
     
     private func convertedViewPosition(for size: CGSize) -> CGPoint {
@@ -185,8 +175,10 @@ struct ImageOverlay: View {
         
         print("🔍 Image size: Original(\(originalWidth)x\(originalHeight)) → View(\(currentWidthView)x\(currentHeightView)) → PDF(\(currentWidthPDF)x\(currentHeightPDF))")
         
-        let adjustedViewX = annotation.midPosition.x - displayOffset.x
-        let adjustedViewY = annotation.midPosition.y - displayOffset.y
+        // Convert view coordinates to PDF coordinates  
+        // Account for PDFEditorView_Internal offset (18, 36)
+        let adjustedViewX = annotation.midPosition.x - displayOffset.x - 18  // Account for .offset(x: 18)
+        let adjustedViewY = annotation.midPosition.y - displayOffset.y - 36  // Account for .offset(y: 36)
         
         let pdfCenterX = adjustedViewX * scaleX
         let pdfCenterY = pageRect.height - (adjustedViewY * scaleY)

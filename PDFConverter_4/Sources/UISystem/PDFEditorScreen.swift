@@ -9,7 +9,7 @@ struct PDFEditorScreen: View {
     var body: some View {
         Group {
             if let pdfDocument = loadPDFDocument() {
-                PDFEditorView(document: pdfDocument, storage: storage)
+                PDFEditorView(document: pdfDocument, documentURL: document.url, storage: storage)
             } else {
                 VStack(spacing: 20) {
                     Image(systemName: "exclamationmark.triangle")

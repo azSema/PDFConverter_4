@@ -16,11 +16,19 @@ struct ContentView: View {
             }
         }
         .overlay {
+            if premium.isPresentingPaywall {
+                SubsView()
+            }
+        }
+        .overlay {
              if premium.isProcessing {
                  AppLoaderView()
              }
          }
          .animation(.easeInOut, value: premium.isProcessing)
+         .environmentObject(router)
+         .environmentObject(pdfStorage)
+         .environmentObject(premium)
     }
     
 }

@@ -21,11 +21,11 @@ struct EditorToolbar: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 20, height: 20)
-                                .foregroundColor(editService.selectedTool == tool ? .appRed : .appStroke)
+                                .foregroundColor(editService.selectedTool == tool ? .appRed : .black.opacity(0.8))
                             
                             Text(tool.title)
                                 .font(.regular(10))
-                                .foregroundColor(editService.selectedTool == tool ? .appRed : .appStroke)
+                                .foregroundColor(editService.selectedTool == tool ? .appRed : .black.opacity(0.8))
                         }
                     }
                     

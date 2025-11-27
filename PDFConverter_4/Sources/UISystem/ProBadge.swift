@@ -21,3 +21,20 @@ struct ProBadge: View {
     }
     
 }
+
+struct ProBanner: View {
+    
+    @EnvironmentObject var premium: PremiumManager
+    
+    var body: some View {
+        Button {
+            premium.presentPaywall(true)
+        } label: {
+            Image(.banner)
+                .resizable()
+                .scaledToFit()
+                .padding(-26)
+        }
+    }
+    
+}
