@@ -249,11 +249,6 @@ final class PDFConverterStorage: ObservableObject {
             print("Failed to load documents: \(error)")
         }
         
-        // Load sample documents only if no other documents exist
-        if documents.isEmpty {
-            loadSampleDocuments()
-        }
-        
         isLoading = false
     }
     
@@ -315,15 +310,6 @@ final class PDFConverterStorage: ObservableObject {
             isFavorite: metadata?.isFavorite ?? false,
             sourcePDFURL: metadata?.sourcePDFURL
         )
-    }
-    
-    private func loadSampleDocuments() {
-        // Load sample PDFs from Bundle
-        print("📄 Loading sample documents for PDFConverter...")
-        loadBundlePDF(named: "pdf1", displayName: "Sample Document 1")
-        loadBundlePDF(named: "pdf2", displayName: "Sample Document 2")
-        
-        print("📄 Loaded \(documents.count) documents from Bundle")
     }
     
     private func loadBundlePDF(named fileName: String, displayName: String) {

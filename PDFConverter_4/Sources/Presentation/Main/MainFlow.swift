@@ -57,39 +57,39 @@ struct MainFlow: View {
     var body: some View {
         NavigationStack(path: $router.path) {
             TabView(selection: $router.selectedTab) {
-                 
-                 ConvertView()
-                     .tag(AppTab.convert)
-                 
-                 EditView()
-                     .tag(AppTab.edit)
-                 
+                
+                ConvertView()
+                    .tag(AppTab.convert)
+                
+                EditView()
+                    .tag(AppTab.edit)
+                
                 EmptyView()
-                     .tag(AppTab.scan)
-                 
-                 SettingsView()
-                     .tag(AppTab.settings)
-             }
-             .navigationDestination(for: Destination.self) { destination in
-                 destination.makeView()
-                     .environmentObject(pdfStorage)
-                     .environmentObject(router)
-             }
-             .overlay(
-                 VStack {
-                     Spacer()
-                     CustomTabBar(selectedTab: $router.selectedTab)
-                 }
-             )
-             .ignoresSafeArea(.all, edges: .bottom)
-             .fullScreenCover(isPresented: $router.isShowingScanner) {
-                 FullScreenScannerView()
-                     .environmentObject(router)
-                     .environmentObject(pdfStorage)
-             }
-             .onAppear(perform: requestReview)
+                    .tag(AppTab.scan)
+                
+                SettingsView()
+                    .tag(AppTab.settings)
+            }
+            .navigationDestination(for: Destination.self) { destination in
+                destination.makeView()
+                    .environmentObject(pdfStorage)
+                    .environmentObject(router)
+            }
+            .overlay(
+                VStack {
+                    Spacer()
+                    CustomTabBar(selectedTab: $router.selectedTab)
+                }
+            )
+            .ignoresSafeArea(.all, edges: .bottom)
+            .fullScreenCover(isPresented: $router.isShowingScanner) {
+                FullScreenScannerView()
+                    .environmentObject(router)
+                    .environmentObject(pdfStorage)
+            }
+            .onAppear(perform: requestReview)
         }
-     }
+    }
     
     func requestReview() {
         if didRequestedReview { return }
@@ -106,7 +106,7 @@ struct CustomTabBar: View {
     
     @EnvironmentObject var premium: PremiumManager
     @EnvironmentObject var pdfStorage: PDFConverterStorage
-
+    
     
     var body: some View {
         
