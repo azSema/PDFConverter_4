@@ -7,6 +7,7 @@ final class ConvertViewModel: ObservableObject {
     
     @Published var selectedOption: ConvertOption = .textToPDF
     @Published var selectedFileType: FileType? = nil
+    @Published var showFavoritesOnly: Bool = false
     @Published var searchText = ""
     @Published var isConverting = false
     @Published var convertProgress: Double = 0
@@ -34,6 +35,11 @@ final class ConvertViewModel: ObservableObject {
     var filteredDocuments: [DocumentDTO] {
         var filtered = documents
         
+        // Фильтр по избранным файлам
+        if showFavoritesOnly {
+            filtered = filtered.filter { $0.isFavorite }
+        }
+        
         // Фильтр по типу файла
         if let selectedType = selectedFileType {
             filtered = filtered.filter { $0.type == selectedType }
@@ -48,6 +54,20 @@ final class ConvertViewModel: ObservableObject {
         }
         
         return filtered
+    }
+    
+    func selectFavoriteFilter() {
+        withAnimation {
+            showFavoritesOnly = true
+            selectedFileType = nil  // Сбрасываем фильтр по типу
+        }
+    }
+
+    func selectFileTypeFilter(_ fileType: FileType?) {
+        withAnimation {
+            selectedFileType = fileType
+            showFavoritesOnly = false  // Сбрасываем фильтр избранного
+        }
     }
     
     init() {

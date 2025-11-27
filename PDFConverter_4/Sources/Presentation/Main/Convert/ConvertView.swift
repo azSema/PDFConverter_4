@@ -22,7 +22,7 @@ struct ConvertView: View {
                             }
                             viewModel.handleTextToPDF()
                         } )
-                    
+                        
                         ConvertOptionCard(option: .imageToPDF,
                                           action: {
                             guard premium.canConvert(currentCount: viewModel.currentConvertsCount) else {
@@ -31,7 +31,7 @@ struct ConvertView: View {
                             }
                             viewModel.handleImageToPDF()
                         } )
-
+                        
                         ConvertOptionCard(option: .pdfToImage,
                                           action: {
                             guard premium.canConvert(currentCount: viewModel.currentConvertsCount) else {
@@ -65,7 +65,7 @@ struct ConvertView: View {
                         .padding(.horizontal)
                         .shadow(color: .appBlack.opacity(0.1), radius: 4, y: 1)
                     }
-                                        
+                    
                 }
                 
                 if viewModel.filteredDocuments.isEmpty {
@@ -172,9 +172,9 @@ struct ConvertView: View {
                                 text: $viewModel.searchText,
                                 prompt: Text("Search").foregroundColor(.white)
                             )
-                                .font(.regular(16))
-                                .tint(.appWhite)
-                                .foregroundColor(.white)
+                            .font(.regular(16))
+                            .tint(.appWhite)
+                            .foregroundColor(.white)
                             
                             Spacer()
                             
@@ -187,9 +187,12 @@ struct ConvertView: View {
                         .background(Color.appWhite.opacity(0.2))
                         .cornerRadius(10)
                     }
-                    CustomHorizontalPicker(selectedFileType: $viewModel.selectedFileType)
-                        .padding(.top, 8)
-                        .padding(.bottom, -16)
+                    CustomHorizontalPicker(
+                        selectedFileType: $viewModel.selectedFileType,
+                        showFavoritesOnly: $viewModel.showFavoritesOnly
+                    )
+                    .padding(.top, 8)
+                    .padding(.bottom, -16)
                 }
             }
         )
@@ -199,7 +202,7 @@ struct ConvertView: View {
         Image(.empty)
             .resizable()
             .scaledToFit()
-            .padding(30)
+            .frame(width: 202, height: 220)
     }
     
     private var noResultsState: some View {
@@ -281,26 +284,64 @@ struct ConvertProgressView: View {
 struct CustomHorizontalPicker: View {
     
     @Binding var selectedFileType: FileType?
+    @Binding var showFavoritesOnly: Bool  // Добавляем binding для избранного
     
     @Namespace var rectangleID
     
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            let options: [FileType?] = [nil] + FileType.allCases
-            ForEach(options, id: \.self) { option in
+            // Опция "All files"
+            favoriteOrAllSegment(isFavorite: false)
+            
+            // Опции по типам файлов
+            ForEach(FileType.allCases, id: \.self) { option in
                 optionSegment(option)
             }
             
+            // Опция "Favorite"
+            favoriteOrAllSegment(isFavorite: true)
         }
         .frame(maxWidth: .infinity)
     }
     
     @ViewBuilder
-    private func optionSegment(_ opt: FileType?) -> some View {
-        if let opt {
+    private func favoriteOrAllSegment(isFavorite: Bool) -> some View {
+        Button {
+            withAnimation(.bouncy(duration: 0.3)) {
+                if isFavorite {
+                    showFavoritesOnly = true
+                    selectedFileType = nil
+                } else {
+                    showFavoritesOnly = false
+                    selectedFileType = nil
+                }
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Text(isFavorite ? "Favorite" : "All files")
+                    .font(.medium(14))
+                    .foregroundColor(.white)
+                    .opacity((isFavorite && showFavoritesOnly) || (!isFavorite && !showFavoritesOnly && selectedFileType == nil) ? 1 : 0.5)
+                
+                if (isFavorite && showFavoritesOnly) || (!isFavorite && !showFavoritesOnly && selectedFileType == nil) {
+                    Rectangle()
+                        .fill(.white)
+                        .frame(width: nil, height: 1.5)
+                        .padding(.horizontal, -5)
+                        .matchedGeometryEffect(id: "rectangleID", in: rectangleID)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    @ViewBuilder
+    private func optionSegment(_ opt: FileType) -> some View {
+        if opt.name != "Text" {
             Button {
                 withAnimation(.bouncy(duration: 0.3)) {
                     selectedFileType = opt
+                    showFavoritesOnly = false
                 }
             } label: {
                 VStack(spacing: 4) {
@@ -308,6 +349,7 @@ struct CustomHorizontalPicker: View {
                         .font(.medium(14))
                         .foregroundColor(.white)
                         .opacity(selectedFileType == opt ? 1 : 0.5)
+                    
                     if selectedFileType == opt {
                         Rectangle()
                             .fill(.white)
@@ -316,34 +358,10 @@ struct CustomHorizontalPicker: View {
                             .matchedGeometryEffect(id: "rectangleID", in: rectangleID)
                     }
                 }
-                .fixedSize()
-                .frame(maxWidth: .infinity)
             }
-        } else {
-            Button {
-                withAnimation(.bouncy(duration: 0.3)) {
-                    selectedFileType = opt
-                }
-            } label: {
-                VStack(spacing: 4) {
-                    Text("All files")
-                        .font(.medium(14))
-                        .foregroundColor(.white)
-                        .opacity(selectedFileType == nil ? 1 : 0.5)
-                    if selectedFileType == nil {
-                        Rectangle()
-                            .fill(.white)
-                            .frame(width: nil, height: 1.5)
-                            .padding(.horizontal, -5)
-                            .matchedGeometryEffect(id: "rectangleID", in: rectangleID)
-                    }
-                }
-                .fixedSize()
-                .frame(maxWidth: .infinity)
-            }
+            .frame(maxWidth: .infinity)
         }
     }
-    
 }
 
 struct ConvertOptionCard: View {
