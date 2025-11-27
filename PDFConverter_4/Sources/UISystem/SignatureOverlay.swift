@@ -4,11 +4,13 @@ import PDFKit
 struct SignatureOverlay: View {
     @ObservedObject var editService: PDFEditService
     @Binding var annotation: IdentifiablePDFAnnotation
+    @Binding var isScaling: Bool
     @State private var isDragging = false
-    @State private var isScaling = false
     @State private var showMenu = false
     
     let geometry: GeometryProxy
+    
+    let onClose: () -> ()
     
     var body: some View {
         let signatureImage = getAnnotationImage()
@@ -41,34 +43,48 @@ struct SignatureOverlay: View {
                     }
             }
             
-            // Interactive border when dragging or scaling
-            if isDragging || isScaling {
+            if /*isDragging || isScaling*/ true {
                 let rectangleWidth = width
                 let rectangleHeight = height
                 let inset: CGFloat = 1
                 
-                Rectangle()
-                    .stroke(Color.appRed, lineWidth: 2)
-                    .frame(width: rectangleWidth, height: rectangleHeight)
-                    .position(clampedPosition)
-                
-                // Corner squares for visual feedback
-                cornerSquare(at: CGPoint(
-                    x: clampedPosition.x - (rectangleWidth / 2) + inset,
-                    y: clampedPosition.y - (rectangleHeight / 2) + inset
-                ))
-                cornerSquare(at: CGPoint(
-                    x: clampedPosition.x + (rectangleWidth / 2) - inset,
-                    y: clampedPosition.y - (rectangleHeight / 2) + inset
-                ))
-                cornerSquare(at: CGPoint(
-                    x: clampedPosition.x - (rectangleWidth / 2) + inset,
-                    y: clampedPosition.y + (rectangleHeight / 2) - inset
-                ))
-                cornerSquare(at: CGPoint(
-                    x: clampedPosition.x + (rectangleWidth / 2) - inset,
-                    y: clampedPosition.y + (rectangleHeight / 2) - inset
-                ))
+                ZStack {
+                    // Dashed rectangle
+                    Rectangle()
+                        .stroke(style: StrokeStyle(lineWidth: 2, dash: [6]))
+                        .foregroundColor(.red)
+                        .frame(width: rectangleWidth, height: rectangleHeight)
+                        .position(clampedPosition)
+                    
+                    // Dashed corner circles
+                    cornerCircle(at: CGPoint(
+                        x: clampedPosition.x - (rectangleWidth / 2) + inset,
+                        y: clampedPosition.y - (rectangleHeight / 2) + inset
+                    ))
+                    cornerCircle(at: CGPoint(
+                        x: clampedPosition.x + (rectangleWidth / 2) - inset,
+                        y: clampedPosition.y - (rectangleHeight / 2) + inset
+                    ))
+                    cornerCircle(at: CGPoint(
+                        x: clampedPosition.x - (rectangleWidth / 2) + inset,
+                        y: clampedPosition.y + (rectangleHeight / 2) - inset
+                    ))
+                    cornerCircle(at: CGPoint(
+                        x: clampedPosition.x + (rectangleWidth / 2) - inset,
+                        y: clampedPosition.y + (rectangleHeight / 2) - inset
+                    ))
+                    
+                    // Close button in top-right corner
+                    Button(action: {
+                        onClose()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(.red)
+                    }
+                    .position(x: clampedPosition.x + (rectangleWidth / 2), y: clampedPosition.y - (rectangleHeight / 2))
+                }
             }
         }
         .gesture(
@@ -88,22 +104,12 @@ struct SignatureOverlay: View {
                     saveSignaturePosition()
                 }
         )
-        .gesture(
-            MagnificationGesture()
-                .onChanged { scale in
-                    print("🔍 Signature scale changed: \(scale)")
-                    let minScale: CGFloat = 0.1
-                    let maxScale: CGFloat = 5.0
-                    let clampedScale = min(max(scale, minScale), maxScale)
-                    annotation.scale = clampedScale
-                    isScaling = true
-                }
-                .onEnded { _ in
-                    print("📏 Signature scale ended: \(annotation.scale)")
-                    isScaling = false
-                    saveSignaturePosition()
-                }
-        )
+        .onChange(of: isScaling) { scaling in
+            if !scaling {
+                // Scale ended, save position
+                saveSignaturePosition()
+            }
+        }
     }
     
     private func convertedViewPosition(for size: CGSize) -> CGPoint {
@@ -139,12 +145,13 @@ struct SignatureOverlay: View {
         return CGPoint(x: clampedX, y: clampedY)
     }
     
-    private func cornerSquare(at position: CGPoint) -> some View {
-        Circle()
-            .fill(Color.appRed)
-            .frame(width: 10, height: 10)
-            .position(position)
-    }
+        private func cornerCircle(at position: CGPoint) -> some View {
+            Circle()
+                .stroke(style: StrokeStyle(lineWidth: 2, dash: [4]))
+                .foregroundColor(.red)
+                .frame(width: 10, height: 10)
+                .position(position)
+        }
     
     private func saveSignaturePosition() {
         // Convert view coordinates back to PDF coordinates and save
@@ -195,8 +202,9 @@ struct SignatureOverlay: View {
         print("🔍 Signature size: Original(\(originalWidth)x\(originalHeight)) → View(\(currentWidthView)x\(currentHeightView)) → PDF(\(currentWidthPDF)x\(currentHeightPDF))")
         
         // Convert view coordinates to PDF coordinates
-        let adjustedViewX = annotation.midPosition.x - displayOffset.x
-        let adjustedViewY = annotation.midPosition.y - displayOffset.y
+        // Account for PDFEditorView_Internal offset (18, 36)
+        let adjustedViewX = annotation.midPosition.x - displayOffset.x - 18  // Account for .offset(x: 18)
+        let adjustedViewY = annotation.midPosition.y - displayOffset.y - 36  // Account for .offset(y: 36)
         
         let pdfCenterX = adjustedViewX * scaleX
         let pdfCenterY = pageRect.height - (adjustedViewY * scaleY) // Flip Y axis for PDF

@@ -1,10 +1,10 @@
 import SwiftUI
+import StoreKit
 
 enum AppTab: CaseIterable {
     case convert
-    case edit
     case scan
-    case sign
+    case edit
     case settings
     
     var title: String {
@@ -12,7 +12,6 @@ enum AppTab: CaseIterable {
         case .convert: return "Convert"
         case .edit: return "Edit"
         case .scan: return "Scan"
-        case .sign: return "Sign"
         case .settings: return "Settings"
         }
     }
@@ -25,8 +24,6 @@ enum AppTab: CaseIterable {
                 .editSelected
         case .scan:
                 .scan
-        case .sign:
-                .signSelected
         case .settings:
                 .settingsSelected
         }
@@ -40,8 +37,6 @@ enum AppTab: CaseIterable {
                 .editNonSelected
         case .scan:
                 .scan
-        case .sign:
-                .signNonSelected
         case .settings:
                 .settingsNonSelected
         }
@@ -52,6 +47,8 @@ struct MainFlow: View {
     
     @EnvironmentObject var router: Router
     @EnvironmentObject var pdfStorage: PDFConverterStorage
+    
+    @AppStorage("didRequestedReview") var didRequestedReview = false
     
     init() {
         UITabBar.appearance().isHidden = true
@@ -69,9 +66,6 @@ struct MainFlow: View {
                  
                 EmptyView()
                      .tag(AppTab.scan)
-                 
-                 SignView()
-                     .tag(AppTab.sign)
                  
                  SettingsView()
                      .tag(AppTab.settings)
@@ -93,8 +87,16 @@ struct MainFlow: View {
                      .environmentObject(router)
                      .environmentObject(pdfStorage)
              }
+             .onAppear(perform: requestReview)
         }
      }
+    
+    func requestReview() {
+        if didRequestedReview { return }
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
+        SKStoreReviewController.requestReview(in: windowScene)
+        didRequestedReview = true
+    }
     
 }
 
@@ -102,15 +104,23 @@ struct CustomTabBar: View {
     @Binding var selectedTab: AppTab
     @Namespace private var animation
     
+    @EnvironmentObject var premium: PremiumManager
+    @EnvironmentObject var pdfStorage: PDFConverterStorage
+
+    
     var body: some View {
         
         HStack(spacing: 8) {
             ForEach(AppTab.allCases, id: \.self) { tab in
-                HStack(spacing: 20) {
+                HStack(spacing: 28) {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            selectedTab = tab
+                        if tab == .scan {
+                            guard premium.canScan(currentCount: pdfStorage.documents.count) else { return
+                                premium.presentPaywall(true)
+                                return
+                            }
                         }
+                        selectedTab = tab
                     } label: {
                         Image(selectedTab == tab ? tab.selectedIcon : tab.nonSelectedIcon)
                             .resizable()

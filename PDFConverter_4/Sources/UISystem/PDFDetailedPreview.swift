@@ -5,6 +5,9 @@ struct PDFDetailedPreview: View {
     let document: DocumentDTO
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var storage: PDFConverterStorage
+    @EnvironmentObject var convertViewModel: ConvertViewModel
+    @EnvironmentObject var premium: PremiumManager
+    
     @EnvironmentObject private var router: Router
     
     @State private var currentPage = 0
@@ -175,6 +178,10 @@ struct PDFDetailedPreview: View {
             // Convert Button  
             Button {
                 dismiss()
+                guard premium.canConvert(currentCount: convertViewModel.currentConvertsCount) else {
+                    premium.presentPaywall(true)
+                    return
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     router.push(.pdfConverter(document))
                 }

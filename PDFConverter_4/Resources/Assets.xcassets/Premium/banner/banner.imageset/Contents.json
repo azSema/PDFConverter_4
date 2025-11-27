@@ -1,0 +1,16 @@
+{
+  "images" : [
+    {
+      "filename" : "Pro-1.png",
+      "idiom" : "iphone"
+    },
+    {
+      "filename" : "Pro.png",
+      "idiom" : "ipad"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

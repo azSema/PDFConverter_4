@@ -73,6 +73,7 @@ extension Destination: AppDesination {
             r.makeView()
         case .pdfDetail(let document):
             PDFDetailedPreview(document: document)
+                .environmentObject(ConvertViewModel())
         case .pdfEditor(let document):
             PDFEditorScreen(document: document)
         case .pdfConverter(let document):

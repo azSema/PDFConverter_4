@@ -12,13 +12,15 @@ struct SettingsView: View {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     }
     
+    @EnvironmentObject var premium: PremiumManager
+    
     var body: some View {
         VStack(spacing: 0) {
             
             // Custom Toolbar
             CustomToolbar(
                 title: "Settings",
-                showProButton: true, content: {}
+                showProButton: !premium.hasSubscription, content: {}
             )
             
             ScrollView {
@@ -44,6 +46,10 @@ struct SettingsView: View {
                     
                     // Settings Options
                     VStack(spacing: 8) {
+                        
+                        if !premium.hasSubscription {
+                            ProBanner()
+                        }
                         
                         SettingsRow(
                             icon: "square.and.arrow.up",

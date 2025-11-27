@@ -23,6 +23,8 @@ final class ConvertViewModel: ObservableObject {
     @Published var showPDFPreview = false
     @Published var selectedDocument: DocumentDTO?
     
+    @AppStorage("currentConvertsCount") var currentConvertsCount = 0
+    
     weak var storage: PDFConverterStorage?
     private let conversionService = DocumentConversionService()
     private var cancellables = Set<AnyCancellable>()
@@ -139,7 +141,7 @@ final class ConvertViewModel: ObservableObject {
             try await storage.saveDocument(document)
             convertedDocument = document
             showSuccessAlert = true
-            
+            currentConvertsCount += 1
         } catch {
             conversionError = error.localizedDescription
         }
@@ -179,7 +181,7 @@ final class ConvertViewModel: ObservableObject {
             try await storage.saveDocument(document)
             convertedDocument = document
             showSuccessAlert = true
-            
+            currentConvertsCount += 1
         } catch {
             conversionError = error.localizedDescription
         }
@@ -221,42 +223,10 @@ final class ConvertViewModel: ObservableObject {
             try await storage.saveDocument(document)
             convertedDocument = document
             showSuccessAlert = true
-            
+            currentConvertsCount += 1
+
         } catch {
             conversionError = error.localizedDescription
-        }
-    }
-    
-    func convertPDFToImages(document: DocumentDTO) async -> [UIImage]? {
-        guard let pdfURL = document.url else {
-            conversionError = "PDF file not found"
-            return nil
-        }
-        
-        do {
-            let imageURLs = try await conversionService.performPDFToImageCollectionConversion(
-                pdfFileURL: pdfURL,
-                imageQuality: 150.0
-            )
-            
-            // Convert URLs to UIImages
-            var resultImages: [UIImage] = []
-            for imageURL in imageURLs {
-                if let imageData = try? Data(contentsOf: imageURL),
-                   let image = UIImage(data: imageData) {
-                    resultImages.append(image)
-                }
-            }
-            
-            if !resultImages.isEmpty {
-                showSuccessAlert = true
-            }
-            
-            return resultImages
-            
-        } catch {
-            conversionError = error.localizedDescription
-            return nil
         }
     }
     
@@ -295,7 +265,8 @@ final class ConvertViewModel: ObservableObject {
             }
             
             showSuccessAlert = true
-            
+            currentConvertsCount += 1
+
         } catch {
             conversionError = error.localizedDescription
         }

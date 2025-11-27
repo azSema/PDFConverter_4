@@ -7,13 +7,15 @@ struct EditView: View {
     @StateObject private var viewModel = EditViewModel()
     @State private var showDocumentTypePicker = false
     
+    @EnvironmentObject var premium: PremiumManager
+    
     var body: some View {
         VStack(spacing: 0) {
             
             // Custom Toolbar
             CustomToolbar(
                 title: "Edit",
-                showProButton: true, content: {}
+                showProButton: !premium.hasSubscription, content: {}
             )
             
             if viewModel.documents.isEmpty && !viewModel.isLoading {
@@ -50,6 +52,7 @@ struct EditView: View {
         .sheet(isPresented: $viewModel.showDocumentDetail) {
             if let document = viewModel.editingDocument {
                 PDFDetailedPreview(document: document)
+                    .environmentObject(ConvertViewModel())
             }
         }
         .fullScreenCover(isPresented: $viewModel.showPDFEditor) {
@@ -58,6 +61,7 @@ struct EditView: View {
                let storage = viewModel.storage {
                 PDFEditorView(
                     document: pdfDocument,
+                    documentURL: document.url,
                     storage: storage
                 )
             }
@@ -101,11 +105,15 @@ struct EditView: View {
 
 struct DocumentsListView: View {
     @EnvironmentObject private var viewModel: EditViewModel
+    @EnvironmentObject var premium: PremiumManager
     
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    if !premium.hasSubscription {
+                        ProBanner()
+                    }
                     ForEach(viewModel.documents) { document in
                         DocumentRowViewWithEdit(
                             document: document,

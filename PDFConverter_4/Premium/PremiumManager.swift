@@ -31,6 +31,18 @@ final class PremiumManager: ObservableObject {
 // MARK: - Features
 extension PremiumManager {
     
-
+    func canEdit() -> Bool {
+        hasSubscription
+    }
+    
+    func canConvert(currentCount: Int) -> Bool {
+        if hasSubscription { return true }
+        return currentCount < 3
+    }
+    
+    func canScan(currentCount: Int) -> Bool {
+        if hasSubscription { return true }
+        return currentCount < 3
+    }
     
 }

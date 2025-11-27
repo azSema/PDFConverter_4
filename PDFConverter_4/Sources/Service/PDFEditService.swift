@@ -37,6 +37,7 @@ final class PDFEditService: ObservableObject {
     
     private var documentId: UUID?
     private var storage: PDFConverterStorage?
+    private var documentURL: URL?
     private var cancellables = Set<AnyCancellable>()
     
     // Store reference to PDFView for coordinate calculations
@@ -71,12 +72,16 @@ final class PDFEditService: ObservableObject {
     
     // MARK: - Configuration
     
-    func loadDocument(_ document: PDFDocument, storage: PDFConverterStorage) {
+    func loadDocument(_ document: PDFDocument, url: URL? = nil, storage: PDFConverterStorage) {
         self.pdfDocument = document
+        self.documentURL = url
         self.storage = storage
         self.currentPageIndex = 0
         
         print("📄 Loaded PDF document with \(document.pageCount) pages")
+        if let url = url {
+            print("📁 Document URL: \(url)")
+        }
         
         // Configure annotations service
         annotationsService.configure(document: document, pageIndex: currentPageIndex)
@@ -352,6 +357,7 @@ final class PDFEditService: ObservableObject {
     }
     
     func resetSignatureService() {
+        showingSignatureCreator = false
         signatureService.clearSignature()
     }
     
@@ -424,10 +430,32 @@ final class PDFEditService: ObservableObject {
             isProcessing = false
         }
         
+        guard let document = pdfDocument else {
+            print("❌ No PDF document to save")
+            return
+        }
+        
         // Save annotations
         annotationsService.saveAnnotations()
         
-        hasUnsavedChanges = false
+        // Save PDF to file if we have URL
+        if let url = documentURL {
+            do {
+                let success = document.write(to: url)
+                if success {
+                    print("💾 PDF document successfully written to file: \(url)")
+                    hasUnsavedChanges = false
+                } else {
+                    print("❌ Failed to write PDF document to file")
+                }
+            } catch {
+                print("❌ Error writing PDF document: \(error)")
+            }
+        } else {
+            print("⚠️ No document URL available - changes saved only in memory")
+            hasUnsavedChanges = false
+        }
+        
         print("💾 Document saved successfully")
     }
     
@@ -440,13 +468,17 @@ final class PDFEditService: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct IdentifiablePDFAnnotation: Identifiable {
+struct IdentifiablePDFAnnotation: Identifiable, Equatable {
     let id = UUID()
     let annotation: PDFAnnotation
     var position: CGPoint
     var midPosition: CGPoint
     var boundingBox: CGRect
     var scale: CGFloat
+    
+    static func == (lhs: IdentifiablePDFAnnotation, rhs: IdentifiablePDFAnnotation) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
 // MARK: - Custom Image Annotation

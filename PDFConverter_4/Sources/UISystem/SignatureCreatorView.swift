@@ -32,6 +32,8 @@ struct SignatureCreatorView: View {
                 } else {
                     savedSignaturesTabContent
                 }
+                
+                Spacer()
             }
             .navigationTitle("Signature")
             .navigationBarTitleDisplayMode(.inline)
@@ -70,6 +72,7 @@ struct SignatureCreatorView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
         .alert("Save Signature", isPresented: $showingNameAlert) {
             TextField("Signature name", text: $signatureName)
             
@@ -195,6 +198,7 @@ struct SignatureCreatorView: View {
                 .clipShape(Rectangle())
             }
             .frame(height: signatureService.maxHeight)
+            .shadow(color: .black.opacity(0.1), radius: 5)
         }
     }
     

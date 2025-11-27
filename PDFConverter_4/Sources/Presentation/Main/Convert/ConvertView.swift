@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct ConvertView: View {
     
     @EnvironmentObject private var storage: PDFConverterStorage
+    @EnvironmentObject var premium: PremiumManager
     @StateObject private var viewModel = ConvertViewModel()
     @State private var inputText = ""
     
@@ -13,11 +14,32 @@ struct ConvertView: View {
                 
                 VStack(spacing: 16) {
                     HStack(spacing: 12) {
-                        ConvertOptionCard(option: .textToPDF, action: viewModel.handleTextToPDF)
+                        ConvertOptionCard(option: .textToPDF,
+                                          action: {
+                            guard premium.canConvert(currentCount: viewModel.currentConvertsCount) else {
+                                premium.presentPaywall(true)
+                                return
+                            }
+                            viewModel.handleTextToPDF()
+                        } )
                     
-                        ConvertOptionCard(option: .imageToPDF, action: viewModel.handleImageToPDF)
+                        ConvertOptionCard(option: .imageToPDF,
+                                          action: {
+                            guard premium.canConvert(currentCount: viewModel.currentConvertsCount) else {
+                                premium.presentPaywall(true)
+                                return
+                            }
+                            viewModel.handleImageToPDF()
+                        } )
 
-                        ConvertOptionCard(option: .pdfToImage, action: viewModel.handlePDFToImage)
+                        ConvertOptionCard(option: .pdfToImage,
+                                          action: {
+                            guard premium.canConvert(currentCount: viewModel.currentConvertsCount) else {
+                                premium.presentPaywall(true)
+                                return
+                            }
+                            viewModel.handlePDFToImage()
+                        } )
                     }
                     
                     Button {
@@ -128,6 +150,7 @@ struct ConvertView: View {
         .sheet(isPresented: $viewModel.showPDFPreview) {
             if let document = viewModel.selectedDocument {
                 PDFDetailedPreview(document: document)
+                    .environmentObject(viewModel)
             }
         }
         .onAppear {
@@ -138,7 +161,7 @@ struct ConvertView: View {
     private var toolbar: some View {
         CustomToolbar(
             title: "LiteConvert",
-            showProButton: true,
+            showProButton: !premium.hasSubscription,
             content: {
                 VStack {
                     HStack {

@@ -6,180 +6,297 @@ import UniformTypeIdentifiers
 struct PDFEditorView: View {
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) var presentationMode
+    
+    @EnvironmentObject var premium: PremiumManager
     
     @StateObject private var editService = PDFEditService()
 
     let document: PDFDocument
+    let documentURL: URL?
     let storage: PDFConverterStorage
+    
+    @State private var isImageScaling = false
+    @State private var isSignatureScaling = false
+    @State private var initialImageScale: CGFloat = 1.0
+    @State private var initialSignatureScale: CGFloat = 1.0
         
     @State private var selectedPhotosPickerItems: [PhotosPickerItem] = []
     @State private var showingUnsavedChangesAlert = false
     
     var body: some View {
-        ZStack {
-            Color.appWhite
-                .ignoresSafeArea()
-            
-            // Main PDF Content
-            if editService.pdfDocument != nil {
-                VStack(spacing: 0) {
-                    // PDF Editor View with Overlays
-                    GeometryReader { geometry in
-                        
-                        ZStack {
+        NavigationView {
+            ZStack {
+                Color.appWhite
+                    .ignoresSafeArea()
+                
+                // Main PDF Content
+                if editService.pdfDocument != nil {
+                    VStack(spacing: 0) {
+                        // PDF Editor View with Overlays
+                        GeometryReader { geometry in
                             
-                            PDFEditorView_Internal(editService: editService)
-                                .onReceive(editService.$insertionPoint) { point in
-                                    if editService.showingImagePicker && point != .zero {
-                                        editService.insertionGeometry = geometry.size
-                                    }
-                                }
-                                .offset(x: 18)
-                                .offset(y: 36)
-                            
-                            if let signatureAnnotation = editService.activeSignatureOverlay {
-                                SignatureOverlay(
-                                    editService: editService,
-                                    annotation: Binding<IdentifiablePDFAnnotation>(
-                                        get: { editService.activeSignatureOverlay ?? signatureAnnotation },
-                                        set: { editService.activeSignatureOverlay = $0 }
-                                    ),
-                                    geometry: geometry
-                                )
-                                .onTapGesture(count: 2) {
-                                    editService.finalizeSignatureOverlay()
-                                }
+                            ZStack {
                                 
-                                VStack {
-                                    HStack {
-                                        Spacer()
-                                        VStack(spacing: 8) {
-                                            Text("Position your signature")
-                                                .font(.medium(14))
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 8)
-                                                .background(Color.black.opacity(0.7))
-                                                .cornerRadius(8)
-                                            
-                                            Button("Done") {
-                                                editService.finalizeSignatureOverlay()
-                                            }
-                                            .font(.medium(14))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(Color.appRed)
-                                            .cornerRadius(8)
+                                PDFEditorView_Internal(editService: editService)
+                                    .onReceive(editService.$insertionPoint) { point in
+                                        if editService.showingImagePicker && point != .zero {
+                                            editService.insertionGeometry = geometry.size
                                         }
-                                        .padding(.top, 80) // Ниже navigation buttons
-                                        .padding(.trailing, 16)
-                                        Spacer()
                                     }
-                                    Spacer()
-                                }
+                                    .offset(x: 18)
+                                    .offset(y: 36)
+                                
+                    if let signatureAnnotation = editService.activeSignatureOverlay {
+                        SignatureOverlay(
+                            editService: editService,
+                            annotation: Binding<IdentifiablePDFAnnotation>(
+                                get: { editService.activeSignatureOverlay ?? signatureAnnotation },
+                                set: { editService.activeSignatureOverlay = $0 }
+                            ),
+                            isScaling: $isSignatureScaling,
+                            geometry: geometry,
+                            onClose: {
+                                editService.activeSignatureOverlay = nil
+                                isSignatureScaling = false
                             }
-                            
-                            // Image overlay when active
-                            if let imageAnnotation = editService.activeImageOverlay {
-                                ImageOverlay(
-                                    editService: editService,
-                                    annotation: Binding<IdentifiablePDFAnnotation>(
-                                        get: { editService.activeImageOverlay ?? imageAnnotation },
-                                        set: { editService.activeImageOverlay = $0 }
-                                    ),
-                                    geometry: geometry
-                                )
-                                .onTapGesture(count: 2) {
-                                    editService.finalizeImageOverlay()
-                                }
-                                
-                                // Image overlay instruction
-                                VStack {
-                                    HStack {
-                                        Spacer()
-                                        VStack(spacing: 8) {
-                                            Text("Position your image")
+                        )
+                        .id(signatureAnnotation.id)
+                        .onTapGesture(count: 2) {
+                            editService.finalizeSignatureOverlay()
+                        }
+                                    
+                                    VStack {
+                                        HStack {
+                                            Spacer()
+                                            VStack(spacing: 8) {
+                                                Text("Position your signature")
+                                                    .font(.medium(14))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.black.opacity(0.7))
+                                                    .cornerRadius(8)
+                                                
+                                                Button("Done") {
+                                                    editService.finalizeSignatureOverlay()
+                                                }
                                                 .font(.medium(14))
                                                 .foregroundColor(.white)
-                                                .padding(.horizontal, 12)
+                                                .padding(.horizontal, 16)
                                                 .padding(.vertical, 8)
-                                                .background(Color.black.opacity(0.7))
+                                                .background(Color.appRed)
                                                 .cornerRadius(8)
-                                            
-                                            Button("Done") {
-                                                editService.finalizeImageOverlay()
                                             }
-                                            .font(.medium(14))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(Color.appRed)
-                                            .cornerRadius(8)
+                                            .padding(.top, 80) // Ниже navigation buttons
+                                            .padding(.trailing, 16)
+                                            Spacer()
                                         }
-                                        .padding(.top, 80) // Ниже navigation buttons
-                                        .padding(.trailing, 16)
                                         Spacer()
                                     }
-                                    Spacer()
                                 }
+                                
+                                // Image overlay when active
+                    if let imageAnnotation = editService.activeImageOverlay {
+                        ImageOverlay(
+                            editService: editService,
+                            annotation: Binding<IdentifiablePDFAnnotation>(
+                                get: { editService.activeImageOverlay ?? imageAnnotation },
+                                set: { editService.activeImageOverlay = $0 }
+                            ),
+                            isScaling: $isImageScaling,
+                            geometry: geometry
+                        )
+                        .id(imageAnnotation.id)
+                        .onTapGesture(count: 2) {
+                            editService.finalizeImageOverlay()
+                        }
+                                    
+                                    // Image overlay instruction
+                                    VStack {
+                                        HStack {
+                                            Spacer()
+                                            VStack(spacing: 8) {
+                                                Text("Position your image")
+                                                    .font(.medium(14))
+                                                    .foregroundColor(.white)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.black.opacity(0.7))
+                                                    .cornerRadius(8)
+                                                
+                                                Button("Done") {
+                                                    editService.finalizeImageOverlay()
+                                                }
+                                                .font(.medium(14))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 8)
+                                                .background(Color.appRed)
+                                                .cornerRadius(8)
+                                            }
+                                            .padding(.top, 80) // Ниже navigation buttons
+                                            .padding(.trailing, 16)
+                                            Spacer()
+                                        }
+                                        Spacer()
+                                    }
+                    }
+                }
+                .onChange(of: editService.activeSignatureOverlay) { overlay in
+                    if let overlay = overlay {
+                        initialSignatureScale = overlay.scale
+                    }
+                }
+                .onChange(of: editService.activeImageOverlay) { overlay in
+                    if let overlay = overlay {
+                        initialImageScale = overlay.scale
+                    }
+                }
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { scale in
+                            // Only handle scaling when overlays are active
+                            guard editService.activeSignatureOverlay != nil || editService.activeImageOverlay != nil else {
+                                return
+                            }
+                                                    
+                            if var activeSignature = editService.activeSignatureOverlay {
+                                let newScale = initialSignatureScale * scale
+                                let clampedScale = min(max(newScale, 0.01), 5.0)
+                                activeSignature.scale = clampedScale
+                                editService.activeSignatureOverlay = activeSignature
+                                isSignatureScaling = true
+                            } else if var activeImage = editService.activeImageOverlay {
+                                let newScale = initialImageScale * scale
+                                let clampedScale = min(max(newScale, 0.01), 5.0)
+                                activeImage.scale = clampedScale
+                                editService.activeImageOverlay = activeImage
+                                isImageScaling = true
                             }
                         }
-                        .pdfDocumentFrame(
-                            pageRect: editService.currentPage?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 595, height: 842),
-                            rotation: Int(editService.currentPage?.rotation ?? 0),
-                            maxRatio: 0.7
-                        )
+                        .onEnded { _ in
+                            guard editService.activeSignatureOverlay != nil || editService.activeImageOverlay != nil else {
+                                return
+                            }
+                            
+                            print("📏 Global scale ended")
+                            
+                            // Update initial scales for next gesture
+                            if let activeSignature = editService.activeSignatureOverlay {
+                                initialSignatureScale = activeSignature.scale
+                            }
+                            if let activeImage = editService.activeImageOverlay {
+                                initialImageScale = activeImage.scale
+                            }
+                            
+                            isSignatureScaling = false
+                            isImageScaling = false
+                        }
+                )
+                .pdfDocumentFrame(
+                    pageRect: editService.currentPage?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 595, height: 842),
+                    rotation: Int(editService.currentPage?.rotation ?? 0),
+                    maxRatio: 0.7
+                )
+                        }
+                        
+                        // Toolbar внизу
+                        if editService.isToolbarVisible {
+                            EditorToolbar(editService: editService)
+                        }
                     }
                     
-                    // Toolbar внизу
-                    if editService.isToolbarVisible {
-                        EditorToolbar(editService: editService)
+                    // Processing overlay
+                    if editService.isProcessing {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                        
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .appRed))
+                            
+                            Text("Saving changes...")
+                                .font(.medium(16))
+                                .foregroundColor(.white)
+                        }
+                        .padding(24)
+                        .background(Color.black.opacity(0.8))
+                        .cornerRadius(12)
                     }
                 }
                 
-                // Processing overlay
-                if editService.isProcessing {
-                    Color.black.opacity(0.4)
-                        .ignoresSafeArea()
-                    
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .appRed))
-                        
-                        Text("Saving changes...")
-                            .font(.medium(16))
-                            .foregroundColor(.white)
+            }
+            .alert("Unsaved Changes", isPresented: $showingUnsavedChangesAlert) {
+                Button("Discard", role: .destructive) {
+                    dismiss()
+                }
+                Button("Save") {
+                    Task {
+                        await editService.saveDocument()
+                        dismiss()
                     }
-                    .padding(24)
-                    .background(Color.black.opacity(0.8))
-                    .cornerRadius(12)
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("You have unsaved changes. Do you want to save them before leaving?")
+            }
+            .onAppear {
+                guard premium.canEdit() else {
+                    dismiss()
+                    premium.presentPaywall(true)
+                    return
+                }
+                editService.loadDocument(document, url: documentURL, storage: storage)
+            }
+            .onDisappear {
+                editService.deselectTool()
+            }
+            .photosPicker(
+                isPresented: $editService.showingImagePicker,
+                selection: $selectedPhotosPickerItems,
+                maxSelectionCount: 1,
+                matching: .images,
+                photoLibrary: .shared()
+            )
+            .onChange(of: selectedPhotosPickerItems) { items in
+                guard let item = items.first else { return }
+                
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        await MainActor.run {
+                            if editService.insertionPoint != .zero {
+                                editService.insertImageAtStoredPoint(image)
+                            } else {
+                                editService.createImageOverlay(with: image)
+                            }
+                            selectedPhotosPickerItems.removeAll()
+                        }
+                    }
                 }
             }
-            
-            // Overlay navigation buttons ПОВЕРХ всего!
-            VStack {
-                HStack {
-                    // Back button
-                    Button(action: handleBackAction) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .medium))
-                            Text("Back")
-                                .font(.regular(16))
+            .navigationTitle("Editor")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(content: {
+                if presentationMode.wrappedValue.isPresented {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: {
+                            Task {
+                                dismiss()
+                            }
+                        }) {
+                            Text("Close")
+                                .font(.semiBold(16))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .cornerRadius(20)
                         }
-                        .foregroundColor(.appBlue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.appWhite.opacity(0.95))
-                        .cornerRadius(20)
-                        .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
                     }
-                    
-                    Spacer()
-                    
-                    // Save button
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
                         Task {
                             await editService.saveDocument()
@@ -195,64 +312,17 @@ struct PDFEditorView: View {
                             .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 3)
                     }
                 }
-                .padding(.horizontal, 20)
-                
-                Spacer()
-            }
-        }
-        .alert("Unsaved Changes", isPresented: $showingUnsavedChangesAlert) {
-            Button("Discard", role: .destructive) {
-                dismiss()
-            }
-            Button("Save") {
-                Task {
-                    await editService.saveDocument()
-                    dismiss()
-                }
-            }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("You have unsaved changes. Do you want to save them before leaving?")
-        }
-        .onAppear {
-            editService.loadDocument(document, storage: storage)
-        }
-        .onDisappear {
-            editService.deselectTool()
-        }
-        // PhotosPicker for adding images
-        .photosPicker(
-            isPresented: $editService.showingImagePicker,
-            selection: $selectedPhotosPickerItems,
-            maxSelectionCount: 1,
-            matching: .images,
-            photoLibrary: .shared()
-        )
-        .onChange(of: selectedPhotosPickerItems) { items in
-            guard let item = items.first else { return }
-            
-            Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    await MainActor.run {
-                        if editService.insertionPoint != .zero {
-                            editService.insertImageAtStoredPoint(image)
-                        } else {
-                            editService.createImageOverlay(with: image)
-                        }
-                        selectedPhotosPickerItems.removeAll()
-                    }
+            })
+            .sheet(isPresented: $editService.showingSignatureCreator) {
+                SignatureCreatorView { signature in
+                    editService.saveSignature(signature)
+                } onCancel: {
+                    editService.resetSignatureService()
                 }
             }
         }
-        // Signature creator sheet
-        .sheet(isPresented: $editService.showingSignatureCreator) {
-            SignatureCreatorView { signature in
-                editService.saveSignature(signature)
-            } onCancel: {
-                editService.resetSignatureService()
-            }
-        }
+        .navigationBarBackButtonHidden(presentationMode.wrappedValue.isPresented)
+        .navigationViewStyle(.stack)
     }
     
     private func handleBackAction() {
@@ -307,6 +377,12 @@ struct PDFEditorView_Internal: UIViewRepresentable {
             if let documentView = pdfView.documentView {
                 print("📐 PDFView documentView bounds: \(documentView.bounds)")
             }
+        }
+        
+        // Disable PDFView zoom gestures when overlays are active
+        let hasActiveOverlay = editService.activeSignatureOverlay != nil || editService.activeImageOverlay != nil
+        if let scrollView = pdfView.subviews.first(where: { $0 is UIScrollView }) as? UIScrollView {
+            scrollView.pinchGestureRecognizer?.isEnabled = !hasActiveOverlay
         }
         
         // Update gesture recognizers based on selected tool

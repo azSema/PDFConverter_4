@@ -17,32 +17,63 @@ struct OnboardingFlow: View {
         
     var body: some View {
         ZStack {
-
-            Color.white
             
-            VStack(spacing: deviceType == .iphoneSE ? 8 : 12) {
-                title(text: getTitle())
-                subtitle(text: getSubtitle())
-                    .frame(height: 50)
-                    .animation(nil, value: step)
-                VStack(spacing: 8) {
-                    VStack(spacing: 5) {
-                        OnboardPageControl(selected: $step)
-                        messageSection
+            BackImage(baseName: step.inputModel().imageBaseName)
+                .overlay {
+                    if step == .page2 {
+                        LottieView(item: .onb2)
+                            .frame(width: UIScreen.main.bounds.width - 120,
+                                   height: UIScreen.main.bounds.height)
+                            .offset(y: -70)
                     }
-
-                    nextButton
+                    if step == .paywall
+                        && deviceType != .iphoneSE
+                        && !orientation.isLandscape
+                    {
+                        VStack {
+                            LottieView(item: .onb_paywall)
+                                .frame(width: deviceType == .ipad ? 300 : 150,
+                                       height: deviceType == .ipad ? 300 : 150)
+                                .padding(.top, deviceType == .ipad ? 50 : 0)
+                            Spacer()
+                        }
+                    }
                 }
-                
-                FooterView(onRestore: {
-                    Task {
-                        await restoreTapped()
+            
+            VStack {
+                Spacer()
+                VStack(spacing: 8) {
+                    title(text: getTitle())
+                    subtitle(text: getSubtitle())
+                        .frame(height: 50)
+                        .animation(nil, value: step)
+                    PageProgress(selected: $step)
+                        .padding(.bottom, 4)
+                        .padding(.top, -8)
+                    VStack(spacing: 6) {
+                        messageSection
+                        nextButton
                     }
-                })
+                    FooterView(onRestore: {
+                        Task {
+                            await restoreTapped()
+                        }
+                    })
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                .background {
+                    Color.white
+                        .clipShape(UnevenRoundedRectangle(cornerRadii: .init(topLeading: 12, bottomLeading: 0, bottomTrailing: 0, topTrailing: 12)))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(.appRed, lineWidth: 1)
+                        }
+                        .edgesIgnoringSafeArea(.bottom)
+                    
+                }
             }
-            .padding(.horizontal)
-            .padding(.top)
-            .frame(maxHeight: .infinity, alignment: .bottom)
+            
         }
         .alert(isPresented: $isShowAlert) {
             Alert(title: Text(alertTitle), message: Text(alertMessage))
@@ -54,8 +85,8 @@ struct OnboardingFlow: View {
     private func subtitle(text: String) -> some View {
         Text(text)
             .frame(maxWidth: .infinity, alignment: .top)
-            .font(.system(size: 15, weight: .regular))
-            .foregroundStyle(.white)
+            .font(.system(size: 16, weight: .regular))
+            .foregroundStyle(.appGrayDark)
             .multilineTextAlignment(.center)
             .overlay(alignment: .bottom) {
                 limittedButton
@@ -72,7 +103,7 @@ struct OnboardingFlow: View {
             Text("LIMITED BUTTON")
                 .font(.system(size: 15, weight: .medium))
                 .frame(maxWidth: .infinity, alignment: .center)
-                .foregroundStyle(.white)
+                .foregroundStyle(.appGrayDark)
         }
     }
     
@@ -82,13 +113,12 @@ struct OnboardingFlow: View {
         VStack {
             if let top = chunks.first, let bottom = chunks.last {
                 Text(top)
-                    .foregroundStyle(.white)
-                    .font(.system(size: deviceType == .iphoneSE ? 26 : 32, weight: .medium))
+                    .font(.system(size: deviceType == .iphoneSE ? 26 : 28, weight: .medium))
                 Text(bottom)
-                    .foregroundStyle(.white)
-                    .font(.system(size: deviceType == .iphoneSE ? 26 : 32, weight: .bold))
+                    .font(.system(size: deviceType == .iphoneSE ? 24 : 26, weight: .medium))
             }
         }
+        .foregroundStyle(.black)
         .multilineTextAlignment(.center)
     }
     
@@ -98,14 +128,14 @@ struct OnboardingFlow: View {
             .frame(height: 48)
             .frame(maxWidth: .infinity, alignment: .leading)
             .font(.system(size: 15))
-            .foregroundStyle(.white)
+            .foregroundStyle(.appGrayDark)
             .overlay(alignment: .trailing) {
                 Toggle(isTrialEnabled ? "" : "", isOn: $isTrialEnabled)
                     .opacity(step == .paywall ? 1 : 0)
             }
             .padding(.horizontal)
-            .background(.white.opacity(0.15))
-            .clipShape(Capsule())
+            .background(.black.opacity(0.05))
+            .cornerRadius(12)
     }
     
     private var nextButton: some View {
@@ -116,10 +146,42 @@ struct OnboardingFlow: View {
                 .font(.system(size: 20, weight: .medium))
                 .padding(.vertical, 14)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .foregroundStyle(.red)
-                .background(Color.white)
-                .cornerRadius(16)
+                .foregroundStyle(.white)
+                .background(.appRed)
+                .cornerRadius(12)
             
+        }
+    }
+    
+    struct PageProgress: View {
+        
+        @Binding var selected: OnboardingPage
+        
+        @Namespace private var animation
+        
+        var body: some View {
+            HStack(spacing: 3) {
+                ForEach(OnboardingPage.allCases, id: \.self) { onboard in
+                    standartControl(for: onboard)
+                }
+            }
+        }
+        
+        @ViewBuilder
+        private func standartControl(for page: OnboardingPage) -> some View {
+            if page == selected {
+                Rectangle()
+                    .fill(.appRed)
+                    .frame(width: 21, height: 6)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 50)
+                    )
+                    .matchedGeometryEffect(id: "IndicatorAnimationId", in: animation)
+            } else {
+                Circle()
+                    .fill(.appBlack.opacity(0.25))
+                    .frame(width: 6, height: 6)
+            }
         }
     }
     
@@ -191,38 +253,6 @@ struct OnboardingFlow: View {
 
 }
 
-struct OnboardPageControl: View {
-    
-    @Binding var selected: OnboardingPage
-    
-    @Namespace private var animation
-    
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(OnboardingPage.allCases, id: \.self) { onboard in
-                standartControl(for: onboard)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func standartControl(for page: OnboardingPage) -> some View {
-        if page == selected {
-            Rectangle()
-                .fill(.white)
-                .frame(width: 13, height: 6)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 50)
-                )
-                .matchedGeometryEffect(id: "IndicatorAnimationId", in: animation)
-        } else {
-            Circle()
-                .fill(.white.opacity(0.15))
-                .frame(width: 6, height: 6)
-        }
-    }
-}
-
 #Preview {
     OnboardingFlow()
 }
@@ -264,21 +294,21 @@ extension OnboardingModel {
         
         switch page {
         case .page1:
-            title = "PDF Tools\n& Scanner "
-            message = "Plan on taking the tests"
-            subtitle = "Choose the date and time\nof the test that suits you"
+            title = "Smart File\nConversion"
+            message = "Create Your First PDF"
+            subtitle = "Convert text, images & documents\ninto clean PDFs in one tap"
             imageBaseName = "onb1"
 
         case .page2:
-            title = "Smart Data\nWriting"
-            message = "Choose the best option"
-            subtitle = "Easily set test dates\nto organize your schedule"
+            title = "Instant Document\nScans"
+            message = "Start Scanning"
+            subtitle = "Scan, enhance, and save text\nas a high-quality PDF"
             imageBaseName = "onb2"
 
         case .page3:
-            title = "Complete\nPDF Toolkit"
-            message = "Pass your tests"
-            subtitle = "Find and save the most\nsuitable centre nearby"
+            title = "Edit\n& Signatures"
+            message = "Professional editing tools included"
+            subtitle = "Add image, highlight and\nsignature your documents"
             imageBaseName = "onb3"
 
         case .page4:
